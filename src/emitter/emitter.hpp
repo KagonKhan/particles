@@ -9,11 +9,20 @@
 #include <cstddef>
 
 
+static constexpr std::size_t MAX_PARTICLES = 1'000'000;
 struct Particle
 {
     float x, y;
     float velocityX, velocityY;
     float age; // seconds remaining
+};
+
+
+struct ParticlePool
+{
+    std::array<ImVec2, MAX_PARTICLES> positions {};
+    std::array<ImVec2, MAX_PARTICLES> velocities {};
+    std::array<float, MAX_PARTICLES> ages {};
 };
 
 
@@ -75,11 +84,11 @@ private:
 class Emitter
 {
 public:
-    static constexpr std::size_t MAX_PARTICLES = 100'000;
+    static constexpr std::size_t MAX_PARTICLES = 1'000'000;
 
 
-    [[nodiscard]] std::size_t     aliveCount() const noexcept { return aliveCount_; }
-    [[nodiscard]] Particle const* data() const noexcept       { return pool_.data(); }
+    [[nodiscard]] std::size_t   aliveCount() const noexcept { return aliveCount_; }
+    [[nodiscard]] ImVec2 const* data() const noexcept       { return pool_.positions.data(); }
 
     void spawn(ImVec2 position, float dt)
     {
@@ -92,13 +101,13 @@ public:
         spawnAccumulator_ -= toSpawn;
 
         for (int i = 0; i < toSpawn; ++i) {
-            auto& particle = pool_[aliveCount_];
-            particle.x         = position.x + rng_.range(-0.1F, 0.1F);
-            particle.y         = position.y + rng_.range(-0.1F, 0.1F);
-            particle.velocityX = 0;
-            particle.velocityY = 0;
-            particle.age       = 0;
-
+            pool_.positions[aliveCount_] = position + ImVec2 {
+                rng_.range(-0.1F, 0.1F),
+                rng_.range(-0.1F, 0.1F)
+            };
+            rng_.unitVector(pool_.velocities[aliveCount_].x, pool_.velocities[aliveCount_].y);
+            pool_.velocities[aliveCount_] *= rng_.range(0.1f, 1.5f);
+            pool_.ages[aliveCount_]        = 0;
 
             ++aliveCount_;
         }
@@ -110,23 +119,26 @@ public:
             return;
         }
 
+
         for (std::size_t i {0}; i < aliveCount_; ++i) {
-            auto& p = pool_[i];
-            p.x   += p.velocityX * dt;
-            p.y   += p.velocityY * dt;
-            p.age += dt;
+            pool_.positions[i] += pool_.velocities[i] * dt;
         }
 
 
-        auto end = std::remove_if(
-            pool_.begin(),
-            pool_.begin() + aliveCount_,
-            [limit = settings_.maxAge] (auto const& particle) {
-                return particle.age >= limit;
-            }
-        );
+        std::size_t i = 0;
 
-        aliveCount_ = std::distance(pool_.begin(), end);
+        while (i < aliveCount_) {
+            pool_.ages[i] += dt;
+            if (pool_.ages[i] >= settings_.maxAge) {
+                --aliveCount_;
+
+                pool_.positions[i] = pool_.positions[aliveCount_];
+                pool_.ages[i]      = pool_.ages[aliveCount_];
+            }
+            else {
+                ++i;
+            }
+        }
     }
 
     void renderSettings()
@@ -147,8 +159,9 @@ public:
 
 private:
 
-    std::size_t                         aliveCount_ {0};
-    std::array<Particle, MAX_PARTICLES> pool_ {};
+    std::size_t aliveCount_ {0};
+    // std::array<Particle, MAX_PARTICLES> pool_ {};
+    ParticlePool pool_;
 
     struct
     {
