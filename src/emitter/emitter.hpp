@@ -7,9 +7,10 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <unordered_set>
 
 
-static constexpr std::size_t MAX_PARTICLES = 1'000'000;
+static constexpr std::size_t MAX_PARTICLES = 100'000'000;
 struct Particle
 {
     float x, y;
@@ -122,6 +123,11 @@ public:
 
         for (std::size_t i {0}; i < aliveCount_; ++i) {
             pool_.positions[i] += pool_.velocities[i] * dt;
+
+            if (pool_.positions[i].x< -1.0F || pool_.positions[i].x > 1.0F ||
+                pool_.positions[i].y< -1.0F || pool_.positions[i].y > 1.0F) {
+                pool_.ages[i] = settings_.maxAge;
+            }
         }
 
 
@@ -157,11 +163,38 @@ public:
         ImGui::End();
     }
 
+    std::pair<ImVec2 const*, std::size_t> cull(float cellSize)
+    {
+        std::unordered_set<std::int64_t> occupiedCells;
+        occupiedCells.reserve(aliveCount_);
+
+        auto cellKey = [cellSize] (float x, float y) -> std::int64_t {
+                std::int32_t cx = static_cast<std::int32_t>(std::floor(x / cellSize));
+                std::int32_t cy = static_cast<std::int32_t>(std::floor(y / cellSize));
+                return (static_cast<std::int64_t>(cx) << 32) | (static_cast<std::uint32_t>(cy));
+            };
+
+        std::size_t count = 0;
+        for (std::size_t i = 0; i < aliveCount_; ++i) {
+            const auto& p = pool_.positions[i];
+            if ((p.x < -1.0f) || (p.x > 1.0f) || (p.y < -1.0f) || (p.y > 1.0f) ) {
+                continue;                                                             // cull offscreen too
+            }
+
+            auto key = cellKey(p.x, p.y);
+            if (occupiedCells.insert(key).second) { // true only if this cell wasn't already taken
+                culled_[count++] = p;
+            }
+        }
+
+        return {culled_.data(), count};
+    }
+
 private:
 
-    std::size_t aliveCount_ {0};
-    // std::array<Particle, MAX_PARTICLES> pool_ {};
-    ParticlePool pool_;
+    std::size_t                       aliveCount_ {0};
+    std::array<ImVec2, MAX_PARTICLES> culled_ {};
+    ParticlePool                      pool_ {};
 
     struct
     {

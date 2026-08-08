@@ -132,4 +132,61 @@ static GLuint createShaderProgram(ShaderPaths const& paths)
     return vfProgram;
 }
 
+static GLuint compileShader(GLenum type, const std::string& source, const std::filesystem::path& debugPath)
+{
+    GLuint      shader = glCreateShader(type);
+    const char* src    = source.c_str();
+    glShaderSource(shader, 1, &src, nullptr);
+    glCompileShader(shader);
+
+    GLint success = GL_FALSE;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        GLint logLength = 0;
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
+
+        std::vector<char> log(logLength > 0? logLength : 1);
+        glGetShaderInfoLog(shader, logLength, nullptr, log.data());
+
+        glDeleteShader(shader);
+        throw std::runtime_error(
+                  "Shader compilation failed (" + debugPath.string() + "):\n" + log.data());
+    }
+
+    return shader;
+}
+
+static GLuint createComputeShaderProgram(const std::filesystem::path& computePath)
+{
+    std::string source  = fileToString(computePath);
+    GLuint      compute = compileShader(GL_COMPUTE_SHADER, source, computePath);
+
+    GLuint program = glCreateProgram();
+    glAttachShader(program, compute);
+    glLinkProgram(program);
+
+    GLint success = GL_FALSE;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success) {
+        GLint logLength = 0;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
+
+        std::vector<char> log(logLength > 0? logLength : 1);
+        glGetProgramInfoLog(program, logLength, nullptr, log.data());
+
+        glDeleteShader(compute);
+        glDeleteProgram(program);
+        throw std::runtime_error(
+                  "Compute shader program linking failed (" + computePath.string() + "):\n" + log.data());
+    }
+
+    // Shader object no longer needed once linked into the program.
+    glDetachShader(program, compute);
+    glDeleteShader(compute);
+
+    spdlog::info("Compiled compute shader program: {}", computePath.string());
+
+    return program;
+}
+
 #endif // YARR_UTILS_OPENGL_HPP

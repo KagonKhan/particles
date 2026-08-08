@@ -1,10 +1,9 @@
-#ifndef TEMPLATE_RENDERER_RENDERER_HPP
-#define TEMPLATE_RENDERER_RENDERER_HPP
-
-#include "utils/opengl.hpp"
+#ifndef YARR_RENDERER_HPP
+#define YARR_RENDERER_HPP
 
 #include "emitter/emitter.hpp"
-#include "image.hpp"
+#include <GL/glew.h> // or whatever GL loader you use
+#include <GLFW/glfw3.h>
 
 class Renderer
 {
@@ -15,11 +14,20 @@ public:
     void render(GLFWwindow* window);
 
 private:
+    void resizeDensityTexture(int w, int h);
+
+    GLint pointSizeLoc_ {-1}; // kept for compatibility, unused now
+    GLint colorLoc_ {-1};
+    GLint splatColorLoc_ {-1};
+    GLint particleCountLoc_ {-1};
+    GLint screenSizeLoc_ {-1};
+    GLint densitySamplerLoc_ {-1};
+    GLint fadeLoc_ {-1};
+
+    int texW_ {0};
+    int texH_ {0};
 
     Emitter emitter;
-    GLint   pointSizeLoc_   = -1;
-    GLint   aspectScaleLoc_ = -1;
-    GLint   colorLoc_       = -1;
 };
 
-#endif // TEMPLATE_RENDERER_RENDERER_HPP
+#endif // YARR_RENDERER_HPP

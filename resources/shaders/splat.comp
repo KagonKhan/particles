@@ -1,0 +1,32 @@
+#version 440
+
+layout(local_size_x = 256) in;
+
+layout(std430, binding = 0) readonly buffer Particles
+{
+    vec2 positions[]; // NDC, [-1,1]
+};
+
+layout(r32ui, binding = 1) uniform uimage2D densityImage;
+
+uniform uint particleCount;
+uniform ivec2 screenSize;
+
+void main()
+{
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= particleCount) {
+        return;
+    }
+
+    vec2 ndc = positions[idx];
+
+    // NDC [-1,1] -> pixel coords [0, screenSize)
+    ivec2 pixel = ivec2((ndc * 0.5 + 0.5) * vec2(screenSize));
+
+    if (pixel.x < 0 || pixel.y < 0 || pixel.x >= screenSize.x || pixel.y >= screenSize.y) {
+        return; // off-screen, skip
+    }
+
+    imageAtomicAdd(densityImage, pixel, 1u);
+}
