@@ -3,6 +3,7 @@
 
 #include "utils/opengl.hpp"
 
+#include "emitter/emitter.hpp"
 #include "image.hpp"
 
 class Renderer
@@ -13,6 +14,8 @@ public:
     void render(GLFWwindow* window);
 
 private:
+
+    Emitter emitter;
 };
 
 #endif // TEMPLATE_RENDERER_RENDERER_HPP
