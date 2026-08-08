@@ -12,7 +12,7 @@ class ImGuiExample(ConanFile):
 
 
     def requirements(self):
-        self.requires("imgui/1.92.5-docking")
+        self.requires("imgui/1.92.9b-docking")
         self.requires("glfw/3.4")
         self.requires("glew/2.2.0")
         self.requires("stb/cci.20240531")
@@ -29,9 +29,9 @@ class ImGuiExample(ConanFile):
 
     def generate(self):
         copy(self, "*glfw*", os.path.join(self.dependencies["imgui"].package_folder,
-            "res", "bindings"), os.path.join(self.source_folder, "bindings"))
+            "res", "bindings"), os.path.join(self.source_folder, "bindings/imgui"))
         copy(self, "*opengl3*", os.path.join(self.dependencies["imgui"].package_folder,
-            "res", "bindings"), os.path.join(self.source_folder, "bindings"))
+            "res", "bindings"), os.path.join(self.source_folder, "bindings/imgui"))
 
 
     def layout(self):

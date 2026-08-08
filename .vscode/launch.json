@@ -12,11 +12,17 @@
             "preLaunchTask": "CMake: build",
             "stopAtEntry": false,
             "cwd": "${command:cmake.buildDirectory}",
-            "environment": [],
+            "environment": [
+            ],
             "externalConsole": false,
             "MIMode": "gdb",
             "envFile": "${command:cmake.buildDirectory}/generators/conanrunenv-${command:cmake.buildType}-x86_64.env",
             "setupCommands": [
+                {
+                    "description": "Clear debuginfod URLs",
+                    "text": "set debuginfod urls ",
+                    "ignoreFailures": true
+                },
                 {
                     "description": "Enable pretty-printing for gdb",
                     "text": "-enable-pretty-printing",
@@ -27,7 +33,11 @@
                 "--no_env_check",
                 "--config=${workspaceFolder}/config/example.yaml",
                 "--log_severity=debug"
-            ]
+            ],
+            "logging": {
+                "engineLogging": true,
+                "trace": true
+            }
         }
     ]
 }

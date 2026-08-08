@@ -4,6 +4,7 @@
 #include "logger.hpp"
 
 #include <atomic>
+#include <chrono>
 #include <type_traits>
 #include <utility>
 
@@ -67,5 +68,15 @@ private:
     inline static std::atomic<int64_t> instances_ {0};
 };
 
+
+struct Time
+{
+    [[nodiscard]] static auto measure() noexcept { return std::chrono::high_resolution_clock::now(); }
+    template <typename Duration = std::chrono::milliseconds>
+    [[nodiscard]] static auto duration(auto const& t1, auto const& t2) noexcept
+    {
+        return std::chrono::duration_cast<Duration>(t2 - t1);
+    }
+};
 
 #endif // PROJECT_UTILS_UTIL_HPP
