@@ -1,16 +1,8 @@
 #version 430
+in vec2 particlePos;
 
-uniform float offset;
-
-void main(void)
+void main()
 {
-    if (gl_VertexID == 0) {
-        gl_Position = vec4(0.25 + offset, -0.25, 0.0, 1.0);
-    }
-    else if (gl_VertexID == 1) {
-        gl_Position = vec4(-0.25 + offset, -0.25, 0.0, 1.0);
-    }
-    else {
-        gl_Position = vec4(0.25 + offset, 0.25, 0.0, 1.0);
-    }
+    gl_Position = vec4(particlePos, 0.0, 1.0);
+    // gl_PointSize = 6.0; // otherwise points render at 1px, easy to miss
 }

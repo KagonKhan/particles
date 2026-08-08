@@ -10,7 +10,7 @@ class Renderer
 public:
     Renderer();
 
-    void render();
+    void render(GLFWwindow* window);
 
 private:
 };

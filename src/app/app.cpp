@@ -1,9 +1,7 @@
 #include "app.hpp"
 
 #include "exceptions.hpp"
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
+
 #include "utils/opengl.hpp"
 #include "utils/utils.hpp"
 
@@ -14,7 +12,7 @@
 namespace
 {
 
-const char* const      glsl_version = "#version 150";
+const char* const      glsl_version = "#version 430";
 const ImGuiWindowFlags window_flags =
     ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse |
     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -42,7 +40,7 @@ void App::initializeGLFW(std::string const& window_name)
 {
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
-        throw GLFWInitializationError("glfwInit failed!");
+        throw InitializationError("glfwInit failed!");
     }
 
 
@@ -54,7 +52,7 @@ void App::initializeGLFW(std::string const& window_name)
 
     window = glfwCreateWindow(2560, 1440, window_name.c_str(), NULL, NULL);
     if (window == NULL) {
-        throw GLFWInitializationError("Could not create a window");
+        throw InitializationError("Could not create a window");
     }
 
     glfwMakeContextCurrent(window);
@@ -131,7 +129,7 @@ void App::run(int fps)
         ImGuiID dockspace_id = ImGui::GetID("RootDockSpace");
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
-        renderer->render();
+        renderer->render(window);
 
         ImGui::Begin("Console Log");
         ImGui::End();
