@@ -1,0 +1,50 @@
+﻿cmake_minimum_required (VERSION 3.23)
+
+# Enable Hot Reload for MSVC compilers if supported.
+if (POLICY CMP0141)
+  cmake_policy(SET CMP0141 NEW)
+  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
+endif()
+
+
+
+# === SETUP ============================================================================================================
+project (ImguiProject CXX)
+set(PROJECT particles)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wconversion)
+
+
+
+# === DEPENDENCIES =====================================================================================================
+add_subdirectory(bindings)
+
+find_package(stb REQUIRED)
+find_package(spdlog REQUIRED)
+
+
+
+# === PROJECT ==========================================================================================================
+add_executable(${PROJECT}
+    src/main.cpp
+
+    src/app/app.cpp
+
+    src/renderer/image.cpp
+    src/renderer/renderer.cpp
+
+    src/utils/logger.cpp
+)
+set_property(TARGET ${PROJECT} PROPERTY CXX_STANDARD 26)
+
+
+target_include_directories(${PROJECT} PUBLIC src)
+
+target_link_libraries(${PROJECT} PUBLIC
+    ImguiBindings
+    
+    stb::stb
+    spdlog::spdlog
+)
+
+target_compile_definitions(${PROJECT} PUBLIC RESOURCE_DIR=${PROJECT_SOURCE_DIR}/resources)

@@ -1,0 +1,13 @@
+﻿#include "app/app.hpp"
+
+
+#include <spdlog/spdlog.h>
+
+
+int main()
+{
+    spdlog::set_level(spdlog::level::trace);
+
+    App app {"Template Project"};
+    app.run();
+}

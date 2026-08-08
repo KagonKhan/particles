@@ -1,3 +1,10 @@
+.vs/*
+build/*
+CMakeUserPresets.json
+
+deps/bindings/*
+
+
 # Prerequisites
 *.d
 
@@ -30,3 +37,15 @@
 *.exe
 *.out
 *.app
+
+
+
+#folders
+debug
+release
+.vs
+x64
+
+#visual files
+*.vcxproj*
+*.sln
