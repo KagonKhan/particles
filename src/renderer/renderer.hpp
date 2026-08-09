@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float3.hpp>
+#include <cstdint>
 
 // Cosine gradient (color = a + b*cos(2pi*(c*t + d))) driven by particle spawn time.
 // The defaults sweep deep blue -> pale blue-white -> rose -> plum, the palette real
@@ -22,9 +23,17 @@ struct NebulaPalette
     float coreWhiten {0.6F}; // how much the densest cores blow out toward white
 };
 
-// Orbits the origin; the particle cloud lives in roughly [-1,1]^3 world space.
+enum class Projection : std::uint8_t
+{
+    Perspective,  // 3D
+    Orthographic, // 2D — parallel projection, no foreshortening
+};
+
+// Orbits the origin, which is where the emitter's spawn plane sits.
 struct Camera
 {
+    Projection projection {Projection::Perspective};
+
     float yaw {0.0F};      // radians, around the world Y axis
     float pitch {0.2F};    // radians, above the XZ plane
     float distance {3.5F}; // from the orbit target
@@ -32,7 +41,13 @@ struct Camera
 
     [[nodiscard]] glm::vec3 forward() const noexcept;
     [[nodiscard]] glm::vec3 eye() const noexcept;
+    [[nodiscard]] glm::mat4 view() const noexcept;
     [[nodiscard]] glm::mat4 viewProj(float aspect) const noexcept;
+
+    // Depth at which a particle should render at full brightness. Tracks the orbit
+    // distance in 3D; in 2D it tracks the fixed standoff, which leaves the depth
+    // weighting near-flat — the physically right answer for a parallel projection.
+    [[nodiscard]] float depthReference() const noexcept;
 };
 
 class Renderer
@@ -54,6 +69,7 @@ private:
     GLint viewProjLoc_ {-1};
     GLint depthFalloffLoc_ {-1};
     GLint depthReferenceLoc_ {-1};
+    GLint viewRowZLoc_ {-1};
     GLint elapsedTimeLoc_ {-1};
     GLint cycleRateLoc_ {-1};
 

@@ -24,6 +24,7 @@ uniform mat4 viewProj;
 
 uniform float depthFalloff;   // 0 = flat, 1 = 1/depth, 2 = inverse-square
 uniform float depthReference; // depth at which a particle contributes exactly 1.0
+uniform vec4 viewRowZ;        // third row of the view matrix, see below
 
 uniform float elapsedTime;    // seconds since startup
 uniform float colorCycleRate; // hue revolutions per second of spawn time
@@ -59,10 +60,16 @@ void main()
     ivec2 pixel = ivec2((ndc.xy * 0.5 + 0.5) * vec2(screenSize));
     pixel       = clamp(pixel, ivec2(0), screenSize - 1);
 
-    // clip.w is the distance along the camera's forward axis. Using it rather than
-    // the euclidean distance to the eye keeps brightness flat across the screen
-    // instead of dimming toward the corners of a wide field of view.
-    float weight = pow(depthReference / max(clip.w, 1e-3), depthFalloff);
+    // Distance along the camera's forward axis. Taking it from the view matrix rather
+    // than from clip.w is what lets one shader serve both projections: clip.w is the
+    // depth only under perspective, and is pinned at 1.0 under orthographic.
+    // Only row 2 of the view matrix contributes, so it travels as a single vec4.
+    // Using forward-axis depth rather than euclidean distance to the eye also keeps
+    // brightness even across the screen instead of dimming toward the corners of a
+    // wide field of view.
+    float depth = -dot(viewRowZ, vec4(world, 1.0));
+
+    float weight = pow(depthReference / max(depth, 1e-3), depthFalloff);
     weight       = clamp(weight, 0.0, kMaxWeight);
 
     // Floor at one quantum so a distant cloud still accumulates into a haze rather

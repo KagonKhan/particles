@@ -64,6 +64,12 @@ std::filesystem::path resource_string = PARTICLES_STRINGIFY(RESOURCE_DIR);
 constexpr glm::vec3 kOrbitTarget {0.0F, 0.0F, 0.0F};
 constexpr glm::vec3 kWorldUp {0.0F, 1.0F, 0.0F};
 
+// An orthographic eye position is arbitrary — zoom comes from the box size, not the
+// standoff. Parking it well back keeps every particle in front of the camera plane
+// so the depth term stays positive, and the far plane covers a long-lived cloud.
+constexpr float kOrthoStandoff = 50.0F;
+constexpr float kOrthoFar      = 500.0F;
+
 } // namespace
 
 glm::vec3 Camera::forward() const noexcept
@@ -73,13 +79,37 @@ glm::vec3 Camera::forward() const noexcept
 
 glm::vec3 Camera::eye() const noexcept
 {
-    return kOrbitTarget - forward() * distance;
+    float standoff = (projection == Projection::Orthographic) ? kOrthoStandoff : distance;
+    return kOrbitTarget - (forward() * standoff);
+}
+
+glm::mat4 Camera::view() const noexcept
+{
+    return glm::lookAt(eye(), kOrbitTarget, kWorldUp);
+}
+
+float Camera::depthReference() const noexcept
+{
+    // Derived from eye() rather than repeating its projection test, so the two cannot
+    // drift apart: this is just the depth of the orbit target itself.
+    return glm::length(kOrbitTarget - eye());
 }
 
 glm::mat4 Camera::viewProj(float aspect) const noexcept
 {
+    if (projection == Projection::Orthographic) {
+        // Size the box to the vertical extent the perspective view would show at the
+        // target plane, so flipping between 2D and 3D doesn't jump the cloud's
+        // on-screen scale and the same Distance/FOV sliders keep working in both.
+        float halfHeight = distance * std::tan(glm::radians(fovDegrees) * 0.5F);
+        float halfWidth  = halfHeight * aspect;
+
+        glm::mat4 proj = glm::ortho(-halfWidth, halfWidth, -halfHeight, halfHeight, 0.01F, kOrthoFar);
+        return proj * view();
+    }
+
     glm::mat4 proj = glm::perspective(glm::radians(fovDegrees), aspect, 0.01F, 1000.0F);
-    return proj * glm::lookAt(eye(), kOrbitTarget, kWorldUp);
+    return proj * view();
 }
 
 Renderer::~Renderer()
@@ -114,6 +144,7 @@ Renderer::Renderer()
 
     depthFalloffLoc_   = glGetUniformLocation(splatProgram, "depthFalloff");
     depthReferenceLoc_ = glGetUniformLocation(splatProgram, "depthReference");
+    viewRowZLoc_       = glGetUniformLocation(splatProgram, "viewRowZ");
     elapsedTimeLoc_    = glGetUniformLocation(splatProgram, "elapsedTime");
     cycleRateLoc_      = glGetUniformLocation(splatProgram, "colorCycleRate");
 
@@ -181,9 +212,37 @@ void Renderer::render(GLFWwindow* window)
     emitter.renderSettings();
 
     ImGui::Begin("Camera");
+
+    int projection = static_cast<int>(camera_.projection);
+    ImGui::RadioButton("3D", &projection, static_cast<int>(Projection::Perspective));
+    ImGui::SameLine();
+    ImGui::RadioButton("2D", &projection, static_cast<int>(Projection::Orthographic));
+    ImGui::SetItemTooltip("Orthographic: same cloud, no perspective foreshortening");
+    camera_.projection = static_cast<Projection>(projection);
+
+    // Axis-aligned views, which is what makes the 2D mode read as a flat plan/elevation
+    // rather than just an unforeshortened 3D shot. Top stops at the same 89 degrees the
+    // pitch slider does, because a camera looking straight down the world up axis makes
+    // lookAt degenerate.
+    if (ImGui::Button("Top")) {
+        camera_.yaw   = 0.0F;
+        camera_.pitch = glm::radians(89.0F);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Front")) {
+        camera_.yaw   = 0.0F;
+        camera_.pitch = 0.0F;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Side")) {
+        camera_.yaw   = glm::radians(90.0F);
+        camera_.pitch = 0.0F;
+    }
+
     ImGui::SliderAngle("Yaw", &camera_.yaw, -180.0F, 180.0F);
     ImGui::SliderAngle("Pitch", &camera_.pitch, -89.0F, 89.0F);
     ImGui::SliderFloat("Distance", &camera_.distance, 0.1F, 20.0F);
+    ImGui::SetItemTooltip("In 2D this scales the view box rather than moving the eye");
     ImGui::SliderFloat("FOV", &camera_.fovDegrees, 10.0F, 120.0F, "%.0f deg");
     static bool autoOrbit = false;
     ImGui::Checkbox("Auto orbit", &autoOrbit);
@@ -193,7 +252,9 @@ void Renderer::render(GLFWwindow* window)
 
     ImGui::Begin("Nebula");
     ImGui::SliderFloat("Depth falloff", &depthFalloff, 0.0F, 3.0F);
-    ImGui::SetItemTooltip("0 = flat, 1 = 1/depth, 2 = inverse-square");
+    ImGui::SetItemTooltip(
+        "0 = flat, 1 = 1/depth, 2 = inverse-square.\n"
+        "Near-flat in 2D: a parallel projection has no distance attenuation.");
     ImGui::SliderFloat("Color cycle", &palette_.cycleRate, 0.0F, 0.5F, "%.3f rev/s");
     ImGui::SliderFloat("Color mix", &palette_.mix, 0.0F, 1.0F);
     ImGui::SliderFloat("Core whiten", &palette_.coreWhiten, 0.0F, 1.0F);
@@ -302,10 +363,13 @@ void Renderer::render(GLFWwindow* window)
     glUniform2i(screenSizeLoc_, w, h);
     glUniformMatrix4fv(viewProjLoc_, 1, GL_FALSE, glm::value_ptr(viewProj));
 
-    // Anchoring the reference depth to the orbit distance keeps the centre of the
+    // Anchoring the reference depth to the camera's standoff keeps the centre of the
     // cloud at full brightness no matter how far the camera pulls back.
+    glm::mat4 view = camera_.view();
+
     glUniform1f(depthFalloffLoc_, depthFalloff);
-    glUniform1f(depthReferenceLoc_, camera_.distance);
+    glUniform1f(depthReferenceLoc_, camera_.depthReference());
+    glUniform4f(viewRowZLoc_, view[0][2], view[1][2], view[2][2], view[3][2]);
     glUniform1f(elapsedTimeLoc_, (float)elapsedTime_);
     glUniform1f(cycleRateLoc_, palette_.cycleRate);
 
