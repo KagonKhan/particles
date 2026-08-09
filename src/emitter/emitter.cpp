@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <unordered_set>
 
-void Emitter::spawn(glm::vec2 position, float dt)
+void Emitter::spawn(glm::vec3 position, float dt)
 {
     if (aliveCount_ >= MAX_PARTICLES) {
         return;
@@ -15,9 +15,10 @@ void Emitter::spawn(glm::vec2 position, float dt)
     spawnAccumulator_ -= toSpawn;
 
     for (int i = 0; i < toSpawn; ++i) {
-        pool_.positions[aliveCount_]  = glm::vec3(position + rng_.range(-0.1F, 0.1F), 0);
-        pool_.velocities[aliveCount_] = glm::sphericalRand(1.0F);
+        glm::vec3 jitter {rng_.range(-0.1F, 0.1F), rng_.range(-0.1F, 0.1F), rng_.range(-0.1F, 0.1F)};
 
+        pool_.positions[aliveCount_]   = position + jitter;
+        pool_.velocities[aliveCount_]  = glm::sphericalRand(1.0F);
         pool_.velocities[aliveCount_] *= glm::linearRand(0.1F, 1.5F);
         pool_.ages[aliveCount_]        = 0;
 
@@ -34,10 +35,11 @@ void Emitter::update(float dt)
     for (std::size_t i {0}; i < aliveCount_; ++i) {
         pool_.positions[i] += pool_.velocities[i] * dt;
 
-        if (pool_.positions[i].x< -1.0F || pool_.positions[i].x > 1.0F ||
-            pool_.positions[i].y< -1.0F || pool_.positions[i].y > 1.0F) {
-            pool_.ages[i] = settings_.maxAge;
-        }
+        // The cloud now lives in a cube, so bound all three axes.
+        // glm::vec3 const& p = pool_.positions[i];
+        // if (glm::any(glm::greaterThan(glm::abs(p), glm::vec3(1.0F)))) {
+        //     pool_.ages[i] = settings_.maxAge;
+        // }
     }
 
 
@@ -48,8 +50,9 @@ void Emitter::update(float dt)
         if (pool_.ages[i] >= settings_.maxAge) {
             --aliveCount_;
 
-            pool_.positions[i] = pool_.positions[aliveCount_];
-            pool_.ages[i]      = pool_.ages[aliveCount_];
+            pool_.positions[i]  = pool_.positions[aliveCount_];
+            pool_.velocities[i] = pool_.velocities[aliveCount_];
+            pool_.ages[i]       = pool_.ages[aliveCount_];
         }
         else {
             ++i;

@@ -2,15 +2,38 @@
 
 layout(local_size_x = 256) in;
 
+// Raw floats, not vec3[]: glm::vec3 is packed to 12 bytes on the CPU, but std430
+// gives an array of vec3 a 16-byte stride. A float array is the only declaration
+// whose layout matches the memcpy'd pool exactly.
 layout(std430, binding = 0) readonly buffer Particles
 {
-    vec2 positions[]; // NDC, [-1,1]
+    float positions[]; // world space, xyz per particle
+};
+
+layout(std430, binding = 2) readonly buffer Ages
+{
+    float ages[]; // seconds since spawn, same index order as positions
 };
 
 layout(r32ui, binding = 1) uniform uimage2D densityImage;
+layout(r32ui, binding = 3) uniform uimage2D hueImage;
 
 uniform uint particleCount;
 uniform ivec2 screenSize;
+uniform mat4 viewProj;
+
+uniform float depthFalloff;   // 0 = flat, 1 = 1/depth, 2 = inverse-square
+uniform float depthReference; // depth at which a particle contributes exactly 1.0
+
+uniform float elapsedTime;    // seconds since startup
+uniform float colorCycleRate; // hue revolutions per second of spawn time
+
+// The density image holds integers, so weighted contributions are accumulated as
+// fixed point: one unit of density is kDensityScale counts. density.frag divides
+// this back out, so the two files must agree on the value.
+const uint  kDensityScale = 64u;
+const float kMaxWeight    = 4.0; // caps how bright a near particle can get, and
+                                 // bounds how fast the 32-bit texture can overflow
 
 void main()
 {
@@ -19,14 +42,44 @@ void main()
         return;
     }
 
-    vec2 ndc = positions[idx];
+    uint base  = idx * 3u;
+    vec3 world = vec3(positions[base], positions[base + 1u], positions[base + 2u]);
 
-    // NDC [-1,1] -> pixel coords [0, screenSize)
-    ivec2 pixel = ivec2((ndc * 0.5 + 0.5) * vec2(screenSize));
-
-    if (pixel.x < 0 || pixel.y < 0 || pixel.x >= screenSize.x || pixel.y >= screenSize.y) {
-        return; // off-screen, skip
+    vec4 clip = viewProj * vec4(world, 1.0);
+    if (clip.w <= 0.0) {
+        return; // behind the eye, the perspective divide would mirror it back on screen
     }
 
-    imageAtomicAdd(densityImage, pixel, 1u);
+    vec3 ndc = clip.xyz / clip.w;
+    if (any(greaterThan(abs(ndc), vec3(1.0)))) {
+        return; // outside the frustum
+    }
+
+    // NDC [-1,1] -> pixel coords [0, screenSize)
+    ivec2 pixel = ivec2((ndc.xy * 0.5 + 0.5) * vec2(screenSize));
+    pixel       = clamp(pixel, ivec2(0), screenSize - 1);
+
+    // clip.w is the distance along the camera's forward axis. Using it rather than
+    // the euclidean distance to the eye keeps brightness flat across the screen
+    // instead of dimming toward the corners of a wide field of view.
+    float weight = pow(depthReference / max(clip.w, 1e-3), depthFalloff);
+    weight       = clamp(weight, 0.0, kMaxWeight);
+
+    // Floor at one quantum so a distant cloud still accumulates into a haze rather
+    // than rounding away to nothing particle by particle.
+    uint contribution = max(uint(weight * float(kDensityScale)), 1u);
+
+    // Absolute spawn time, so a burst emitted at one moment keeps its color for life
+    // instead of every particle marching through the same gradient as it ages.
+    float spawnTime = elapsedTime - ages[idx];
+    float hue       = fract(spawnTime * colorCycleRate);
+
+    // Accumulating hue*contribution alongside contribution lets the resolve pass
+    // recover a density-weighted average hue with one divide. The fixed-point scale
+    // is present in both sums, so it cancels out.
+    // Rounding rather than truncating matters at the faint end: a distant particle
+    // contributes a single quantum, and truncation would drag every one of them to
+    // hue 0 instead of averaging out across the cloud.
+    imageAtomicAdd(densityImage, pixel, contribution);
+    imageAtomicAdd(hueImage, pixel, uint((hue * float(contribution)) + 0.5));
 }

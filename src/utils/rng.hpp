@@ -1,6 +1,8 @@
 #ifndef YARR_RNG_HPP
 #define YARR_RNG_HPP
 
+#include <algorithm>
+#include <cmath>
 #include <random>
 
 class RNG
@@ -39,14 +41,18 @@ public:
         y = std::sin(a);
     }
 
+    // Uniform point on the unit sphere. Sampling z directly rather than a pitch
+    // angle is what keeps the distribution even — picking pitch uniformly would
+    // bunch the directions up around the poles.
     void unitVector(float& x, float& y, float& z)
     {
-        float yaw   = angle(); // Angle around the Z-axis (in radians)
-        float pitch = angle(); // Angle above/below the XY-plane (in radians)
+        z = range(-1.0f, 1.0f);
 
-        x = std::cos(pitch) * std::cos(yaw);
-        y = std::cos(pitch) * std::sin(yaw);
-        z = std::sin(pitch);
+        float yaw    = angle();
+        float radius = std::sqrt(std::max(0.0f, 1.0f - (z * z)));
+
+        x = radius * std::cos(yaw);
+        y = radius * std::sin(yaw);
     }
 
     // 0.0 to 1.0

@@ -29,13 +29,17 @@ struct ParticlePool
 class Emitter
 {
 public:
-    void spawn(glm::vec2 position, float dt);
+    void spawn(glm::vec3 position, float dt);
     void update(float dt);
     void renderSettings();
 
 
     [[nodiscard]] std::size_t           aliveCount() const noexcept { return aliveCount_; }
     [[nodiscard]] ParticleVector const* data() const noexcept       { return pool_.positions.data(); }
+
+    // Ages are swap-removed alongside positions, so index i refers to the same
+    // particle in both. The renderer turns age back into an absolute spawn time.
+    [[nodiscard]] float const* ages() const noexcept { return pool_.ages.data(); }
 
 
     // std::pair<ImVec2 const*, std::size_t> culled(float cell_size);
