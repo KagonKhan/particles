@@ -39,6 +39,16 @@ public:
         y = std::sin(a);
     }
 
+    void unitVector(float& x, float& y, float& z)
+    {
+        float yaw   = angle(); // Angle around the Z-axis (in radians)
+        float pitch = angle(); // Angle above/below the XY-plane (in radians)
+
+        x = std::cos(pitch) * std::cos(yaw);
+        y = std::cos(pitch) * std::sin(yaw);
+        z = std::sin(pitch);
+    }
+
     // 0.0 to 1.0
     float normalized()
     {

@@ -1,5 +1,6 @@
 #include "renderer.hpp"
 
+#include "emitter/emitter.hpp"
 #include "utils/opengl.hpp"
 #include "utils/shader_cache.hpp"
 #include "utils/utils.hpp"
@@ -68,11 +69,11 @@ Renderer::Renderer()
 
     for (std::size_t i = 0; i < BufferCount; ++i) {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, particleSSBO[i]);
-        glBufferStorage(GL_SHADER_STORAGE_BUFFER, MAX_PARTICLES * sizeof(ImVec2), nullptr, storageFlags);
+        glBufferStorage(GL_SHADER_STORAGE_BUFFER, MAX_PARTICLES * sizeof(ParticleVector), nullptr, storageFlags);
         mappedPtr[i] = glMapBufferRange(
             GL_SHADER_STORAGE_BUFFER,
             0,
-            MAX_PARTICLES * sizeof(ImVec2),
+            MAX_PARTICLES * sizeof(ParticleVector),
             storageFlags);
 
         if (!mappedPtr[i]) {
@@ -156,7 +157,7 @@ void Renderer::render(GLFWwindow* window)
     // auto [data, length] = emitter.cull(1.f/1000.0);
     auto data   = emitter.data();
     auto length = emitter.aliveCount();
-    std::memcpy(mappedPtr[currentBuffer], data, length * sizeof(ImVec2));
+    std::memcpy(mappedPtr[currentBuffer], data, length * sizeof(ParticleVector));
     auto t_upload = Time::measure();
 
     GLuint count = static_cast<GLuint>(emitter.aliveCount());

@@ -21,6 +21,7 @@ add_subdirectory(bindings)
 
 find_package(stb REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(glm REQUIRED)
 
 
 
@@ -39,6 +40,7 @@ add_executable(${PROJECT}
     src/utils/logger.cpp
     src/utils/shader_cache.cpp
     src/utils/rng.cpp
+    src/app/scene.cpp
 )
 
 set_property(TARGET ${PROJECT} PROPERTY CXX_STANDARD 26)
@@ -51,6 +53,7 @@ target_link_libraries(${PROJECT} PUBLIC
     
     stb::stb
     spdlog::spdlog
+    none
 )
 
 target_compile_definitions(${PROJECT} PUBLIC RESOURCE_DIR=${PROJECT_SOURCE_DIR}/resources)

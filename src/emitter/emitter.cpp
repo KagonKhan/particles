@@ -1,9 +1,10 @@
 #include "emitter.hpp"
 
+#include <glm/gtc/random.hpp>
 #include <algorithm>
 #include <unordered_set>
 
-void Emitter::spawn(ImVec2 position, float dt)
+void Emitter::spawn(glm::vec2 position, float dt)
 {
     if (aliveCount_ >= MAX_PARTICLES) {
         return;
@@ -14,12 +15,10 @@ void Emitter::spawn(ImVec2 position, float dt)
     spawnAccumulator_ -= toSpawn;
 
     for (int i = 0; i < toSpawn; ++i) {
-        pool_.positions[aliveCount_] = position + ImVec2 {
-            rng_.range(-0.1F, 0.1F),
-            rng_.range(-0.1F, 0.1F)
-        };
-        rng_.unitVector(pool_.velocities[aliveCount_].x, pool_.velocities[aliveCount_].y);
-        pool_.velocities[aliveCount_] *= rng_.range(0.1f, 1.5f);
+        pool_.positions[aliveCount_]  = glm::vec3(position + rng_.range(-0.1F, 0.1F), 0);
+        pool_.velocities[aliveCount_] = glm::sphericalRand(1.0F);
+
+        pool_.velocities[aliveCount_] *= glm::linearRand(0.1F, 1.5F);
         pool_.ages[aliveCount_]        = 0;
 
         ++aliveCount_;
@@ -74,29 +73,29 @@ void Emitter::renderSettings()
     ImGui::End();
 }
 
-std::pair<ImVec2 const*, std::size_t> Emitter::culled(float cell_size)
-{
-    std::unordered_set<std::int64_t> occupiedCells;
-    occupiedCells.reserve(aliveCount_);
+// std::pair<ImVec2 const*, std::size_t> Emitter::culled(float cell_size)
+// {
+//     std::unordered_set<std::int64_t> occupiedCells;
+//     occupiedCells.reserve(aliveCount_);
 
-    auto cellKey = [cell_size] (float x, float y) -> std::int64_t {
-            auto cx = static_cast<std::int32_t>(std::floor(x / cell_size));
-            auto cy = static_cast<std::int32_t>(std::floor(y / cell_size));
-            return (static_cast<std::int64_t>(cx) << 32) | (static_cast<std::uint32_t>(cy));
-        };
+//     auto cellKey = [cell_size] (float x, float y) -> std::int64_t {
+//             auto cx = static_cast<std::int32_t>(std::floor(x / cell_size));
+//             auto cy = static_cast<std::int32_t>(std::floor(y / cell_size));
+//             return (static_cast<std::int64_t>(cx) << 32) | (static_cast<std::uint32_t>(cy));
+//         };
 
-    std::size_t count = 0;
-    for (std::size_t i = 0; i < aliveCount_; ++i) {
-        const auto& p = pool_.positions[i];
-        if ((p.x < -1.0f) || (p.x > 1.0f) || (p.y < -1.0f) || (p.y > 1.0f) ) {
-            continue;                                                                 // cull offscreen too
-        }
+//     std::size_t count = 0;
+//     for (std::size_t i = 0; i < aliveCount_; ++i) {
+//         const auto& p = pool_.positions[i];
+//         if ((p.x < -1.0f) || (p.x > 1.0f) || (p.y < -1.0f) || (p.y > 1.0f) ) {
+//             continue;                                                                 // cull offscreen too
+//         }
 
-        auto key = cellKey(p.x, p.y);
-        if (occupiedCells.insert(key).second) {     // true only if this cell wasn't already taken
-            culled_[count++] = p;
-        }
-    }
+//         auto key = cellKey(p.x, p.y);
+//         if (occupiedCells.insert(key).second) {     // true only if this cell wasn't already taken
+//             culled_[count++] = p;
+//         }
+//     }
 
-    return {culled_.data(), count};
-}
+//     return {culled_.data(), count};
+// }

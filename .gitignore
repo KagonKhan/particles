@@ -1,6 +1,9 @@
-.vs/*
+# Hidden dirs 
+.*/* 
+
 build/*
 CMakeUserPresets.json
+compile_commands.json
 
 deps/bindings/*
 
