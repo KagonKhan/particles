@@ -2,9 +2,10 @@
 
 #include <glm/gtc/random.hpp>
 #include <algorithm>
+#include <cmath>
 #include <unordered_set>
 
-void Emitter::spawn(glm::vec3 position, float dt)
+void Emitter::spawn(SpawnFrame const& frame, float dt)
 {
     if (aliveCount_ >= MAX_PARTICLES) {
         return;
@@ -14,13 +15,30 @@ void Emitter::spawn(glm::vec3 position, float dt)
     int toSpawn = std::min((int)MAX_PARTICLES - (int)aliveCount_, static_cast<int>(spawnAccumulator_));
     spawnAccumulator_ -= toSpawn;
 
-    for (int i = 0; i < toSpawn; ++i) {
-        glm::vec3 jitter {rng_.range(-0.1F, 0.1F), rng_.range(-0.1F, 0.1F), rng_.range(-0.1F, 0.1F)};
+    constexpr float kJitter = 0.1F;
 
-        pool_.positions[aliveCount_]   = position + jitter;
-        pool_.velocities[aliveCount_]  = glm::sphericalRand(1.0F);
-        pool_.velocities[aliveCount_] *= glm::linearRand(0.1F, 1.5F);
-        pool_.ages[aliveCount_]        = 0;
+    for (int i = 0; i < toSpawn; ++i) {
+        glm::vec3 jitter {};
+        glm::vec3 direction {};
+
+        if (frame.planar) {
+            // Both the offset and the direction are built from the plane's own basis, so
+            // neither picks up a component along its normal. Particles then stay exactly
+            // in the plane for life, since integrating a velocity that lies in it cannot
+            // take them out of it.
+            float angle = rng_.angle();
+
+            jitter    = (frame.right * rng_.range(-kJitter, kJitter)) + (frame.up * rng_.range(-kJitter, kJitter));
+            direction = (frame.right * std::cos(angle)) + (frame.up * std::sin(angle));
+        }
+        else {
+            jitter    = {rng_.range(-kJitter, kJitter), rng_.range(-kJitter, kJitter), rng_.range(-kJitter, kJitter)};
+            direction = glm::sphericalRand(1.0F);
+        }
+
+        pool_.positions[aliveCount_]  = frame.origin + jitter;
+        pool_.velocities[aliveCount_] = direction * glm::linearRand(0.1F, 1.5F);
+        pool_.ages[aliveCount_]       = 0;
 
         ++aliveCount_;
     }

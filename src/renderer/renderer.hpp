@@ -40,6 +40,11 @@ struct Camera
     float fovDegrees {60.0F};
 
     [[nodiscard]] glm::vec3 forward() const noexcept;
+
+    // Screen right and up in world space — the basis of the plane facing the camera.
+    [[nodiscard]] glm::vec3 right() const noexcept;
+    [[nodiscard]] glm::vec3 up() const noexcept;
+
     [[nodiscard]] glm::vec3 eye() const noexcept;
     [[nodiscard]] glm::mat4 view() const noexcept;
     [[nodiscard]] glm::mat4 viewProj(float aspect) const noexcept;
@@ -86,6 +91,7 @@ private:
     int texW_ {0};
     int texH_ {0};
 
+    bool          planarEmission_ {false};
     double        elapsedTime_ {0.0};
     Camera        camera_;
     NebulaPalette palette_;

@@ -77,6 +77,18 @@ glm::vec3 Camera::forward() const noexcept
     return {std::cos(pitch) * std::sin(yaw), std::sin(pitch), std::cos(pitch) * std::cos(yaw)};
 }
 
+glm::vec3 Camera::right() const noexcept
+{
+    // Safe while pitch stays inside +-89 degrees, which both the slider and the Top
+    // button respect; at a true pole this cross product collapses to zero.
+    return glm::normalize(glm::cross(forward(), kWorldUp));
+}
+
+glm::vec3 Camera::up() const noexcept
+{
+    return glm::cross(right(), forward());
+}
+
 glm::vec3 Camera::eye() const noexcept
 {
     float standoff = (projection == Projection::Orthographic) ? kOrthoStandoff : distance;
@@ -213,12 +225,25 @@ void Renderer::render(GLFWwindow* window)
 
     ImGui::Begin("Camera");
 
-    int projection = static_cast<int>(camera_.projection);
-    ImGui::RadioButton("3D", &projection, static_cast<int>(Projection::Perspective));
+    int  projection = static_cast<int>(camera_.projection);
+    bool switched   = ImGui::RadioButton("3D", &projection, static_cast<int>(Projection::Perspective));
     ImGui::SameLine();
-    ImGui::RadioButton("2D", &projection, static_cast<int>(Projection::Orthographic));
+    switched = ImGui::RadioButton("2D", &projection, static_cast<int>(Projection::Orthographic)) || switched;
     ImGui::SetItemTooltip("Orthographic: same cloud, no perspective foreshortening");
-    camera_.projection = static_cast<Projection>(projection);
+
+    if (switched) {
+        camera_.projection = static_cast<Projection>(projection);
+
+        // Flattening the projection alone still looks 3D, because a volumetric burst
+        // keeps moving toward and away from the camera. Emission follows the mode by
+        // default, but only on the switch, so the override below stays overridable.
+        planarEmission_ = (camera_.projection == Projection::Orthographic);
+    }
+
+    ImGui::Checkbox("Planar emission", &planarEmission_);
+    ImGui::SetItemTooltip(
+        "Confine new particles to the plane facing the camera.\n"
+        "Existing particles keep the motion they were born with.");
 
     // Axis-aligned views, which is what makes the 2D mode read as a flat plan/elevation
     // rather than just an unforeshortened 3D shot. Top stops at the same 89 degrees the
@@ -321,7 +346,12 @@ void Renderer::render(GLFWwindow* window)
         if (std::abs(denom) > 1e-6F) {
             float t = glm::dot(kOrbitTarget - origin, forward) / denom;
             if (t > 0.0F) {
-                emitter.spawn(origin + (ray * t), (float)dt);
+                emitter.spawn(
+                    {.origin = origin + (ray * t),
+                     .right  = camera_.right(),
+                     .up     = camera_.up(),
+                     .planar = planarEmission_},
+                    (float)dt);
             }
         }
     }

@@ -6,8 +6,18 @@
 class Scene
 {
 public:
-    void render(float dt);
-    void update(float dt);
+    void render(float dt)
+    {
+        ImGui::Begin("Scene");
+
+
+        ImGui::End();
+    }
+
+    void update(float dt)
+    {
+        emitter.update(dt);
+    }
 
 private:
     Emitter emitter;

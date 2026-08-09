@@ -18,6 +18,20 @@ static constexpr std::size_t MAX_PARTICLES = 100'000'000;
 
 using ParticleVector = glm::vec3;
 
+// Where and along which axes a burst is emitted. The emitter stays ignorant of the
+// camera; the caller supplies the basis, which is what lets a flat view emit a flat
+// burst without the emitter knowing a projection exists.
+struct SpawnFrame
+{
+    glm::vec3 origin {0.0F, 0.0F, 0.0F};
+    glm::vec3 right {1.0F, 0.0F, 0.0F};
+    glm::vec3 up {0.0F, 1.0F, 0.0F};
+
+    // When set, jitter and velocity are confined to the right/up plane, so particles
+    // have no motion at all along its normal.
+    bool planar {false};
+};
+
 struct ParticlePool
 {
     std::array<ParticleVector, MAX_PARTICLES> positions {};
@@ -29,7 +43,7 @@ struct ParticlePool
 class Emitter
 {
 public:
-    void spawn(glm::vec3 position, float dt);
+    void spawn(SpawnFrame const& frame, float dt);
     void update(float dt);
     void renderSettings();
 
