@@ -27,4 +27,15 @@ struct FileError : std::runtime_error
     {}
 };
 
+
+struct ShaderError : std::runtime_error
+{
+    using std::runtime_error::runtime_error;
+
+    template <typename ... Args>
+    ShaderError(fmt::format_string<Args...> fmt, Args&&... args)
+        : std::runtime_error(fmt::format(fmt, std::forward<Args>(args)...))
+    {}
+};
+
 #endif // YARR_EXCEPTIONS_HPP

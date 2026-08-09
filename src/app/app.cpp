@@ -9,48 +9,45 @@
 #include <chrono>
 #include <cstdio>
 
+
+#include "utils/shader_cache.hpp"
+
 namespace
 {
 
-const char* const      glsl_version = "#version 440";
-const ImGuiWindowFlags window_flags =
+std::filesystem::path  resource_string = PARTICLES_STRINGIFY(RESOURCE_DIR);
+const char* const      glsl_version    = "#version 440";
+const ImGuiWindowFlags window_flags    =
     ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse |
     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
     ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground
 ;
 
+
+void glfw_error_callback(int error, const char* description)
+{
+    spdlog::error("Glfw Error {}: {}\n", error, description);
+}
+
 } // namespace
 
-static void glfw_error_callback(int error, const char* description)
-{
-    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
-}
 
 App::App(std::string const& title)
 {
-    initializeGLFW(title);
-
-    initializeIMGUI();
-
-    renderer = new Renderer();
-}
-
-void App::initializeGLFW(std::string const& window_name)
-{
+    // ===   GLFW INITIALIZATION   =====================================================================================
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit()) {
         throw InitializationError("glfwInit failed!");
     }
 
 
-    // GL 3.0 + GLSL 130
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);   // 3.2+
     //  only glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // 3.0+ only
 
-    window = glfwCreateWindow(2560, 1440, window_name.c_str(), NULL, NULL);
+    window = glfwCreateWindow(2560, 1440, title.c_str(), NULL, NULL);
     if (window == NULL) {
         throw InitializationError("Could not create a window");
     }
@@ -60,16 +57,11 @@ void App::initializeGLFW(std::string const& window_name)
         exit(EXIT_FAILURE);
     }
 
-
     glfwSwapInterval(0);
-
-
     // glfwSwapInterval(1); // Enable vsync
-}
 
-void App::initializeIMGUI()
-{
-    // Setup Dear ImGui context
+
+    // ===   IMGUI INITIALIZATION   ====================================================================================
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -77,7 +69,7 @@ void App::initializeIMGUI()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;                   // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;                    // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;                       // Enable Docking
-    // io.ConfigFlags                 |= ImGuiConfigFlags_ViewportsEnable;     // Enable Multi-Viewport
+    // io.ConfigFlags                 |= ImGuiConfigFlags_ViewportsEnable;  // Enable Multi-Viewport
     io.ConfigViewportsNoAutoMerge   = true;
     io.ConfigViewportsNoTaskBarIcon = true;
 
@@ -92,6 +84,42 @@ void App::initializeIMGUI()
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
+
+
+    // ===   SHADER INITIALIZATION   ===================================================================================
+    ShaderCache::compileProgram(
+        "SplatProgram",
+        {
+            ShaderCache::load(
+                "splat_compute",
+                {
+                    .source = resource_string / "shaders/splat.comp",
+                    .type   = GL_COMPUTE_SHADER
+                })
+        }
+    );
+
+    ShaderCache::compileProgram(
+        "ResolveProgram",
+        {
+            ShaderCache::load(
+                "fullscreen_vertex",
+                {
+                    .source = resource_string / "shaders/fullscreen.vert",
+                    .type   = GL_VERTEX_SHADER
+                }),
+            ShaderCache::load(
+                "density_fragment",
+                {
+                    .source = resource_string / "shaders/density.frag",
+                    .type   = GL_FRAGMENT_SHADER
+                }),
+        }
+    );
+
+
+    // TODO: Fix the ordering problems. Shader cache needs to load before renderer
+    renderer = new Renderer();
 }
 
 App::~App()
@@ -132,6 +160,7 @@ void App::run(int fps)
         renderer->render(window);
 
         ImGui::Begin("Console Log");
+        console.render();
         ImGui::End();
 
         ImGui::End();

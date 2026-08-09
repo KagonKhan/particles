@@ -1,6 +1,7 @@
 #ifndef YARR_APP_APP_HPP
 #define YARR_APP_APP_HPP
 
+#include "app/console.hpp"
 #include "renderer/renderer.hpp"
 
 #include <GLFW/glfw3.h>
@@ -22,8 +23,9 @@ private:
     void startNewFrame();
     void finishFrame();
 
-    GLFWwindow* window;
-    Renderer*   renderer;
+    GLFWwindow*   window;
+    Renderer*     renderer;
+    OutputConsole console;
 };
 
 #endif

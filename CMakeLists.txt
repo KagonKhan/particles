@@ -29,12 +29,18 @@ add_executable(${PROJECT}
     src/main.cpp
 
     src/app/app.cpp
+    src/app/console.cpp
+
+    src/emitter/emitter.cpp
 
     src/renderer/image.cpp
     src/renderer/renderer.cpp
 
     src/utils/logger.cpp
+    src/utils/shader_cache.cpp
+    src/utils/rng.cpp
 )
+
 set_property(TARGET ${PROJECT} PROPERTY CXX_STANDARD 26)
 
 

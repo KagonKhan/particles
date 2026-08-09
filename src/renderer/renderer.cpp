@@ -1,6 +1,7 @@
 #include "renderer.hpp"
 
 #include "utils/opengl.hpp"
+#include "utils/shader_cache.hpp"
 #include "utils/utils.hpp"
 
 #include <cmath>
@@ -48,12 +49,8 @@ Renderer::~Renderer()
 
 Renderer::Renderer()
 {
-    splatProgram   = createComputeShaderProgram(resource_string / "shaders/splat.comp");
-    resolveProgram = createShaderProgram(
-        {
-            .vertex   = resource_string / "shaders/fullscreen.vert",
-            .fragment = resource_string / "shaders/density.frag"
-        });
+    splatProgram   = ShaderCache::getProgram("SplatProgram");
+    resolveProgram = ShaderCache::getProgram("ResolveProgram");
 
     particleCountLoc_ = glGetUniformLocation(splatProgram, "particleCount");
     screenSizeLoc_    = glGetUniformLocation(splatProgram, "screenSize");
@@ -71,11 +68,11 @@ Renderer::Renderer()
 
     for (std::size_t i = 0; i < BufferCount; ++i) {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, particleSSBO[i]);
-        glBufferStorage(GL_SHADER_STORAGE_BUFFER, Emitter::MAX_PARTICLES * sizeof(ImVec2), nullptr, storageFlags);
+        glBufferStorage(GL_SHADER_STORAGE_BUFFER, MAX_PARTICLES * sizeof(ImVec2), nullptr, storageFlags);
         mappedPtr[i] = glMapBufferRange(
             GL_SHADER_STORAGE_BUFFER,
             0,
-            Emitter::MAX_PARTICLES * sizeof(ImVec2),
+            MAX_PARTICLES * sizeof(ImVec2),
             storageFlags);
 
         if (!mappedPtr[i]) {

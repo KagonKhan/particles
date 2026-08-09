@@ -5,5 +5,12 @@ Checks: >
   performance-*,
   modernize-*,
   readability-*,
-  -modernize-use-trailing-return-type
+  -modernize-use-trailing-return-type,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -readability-identifier-length,
+  -cppcoreguidelines-pro-type-vararg,
+  -readability-uppercase-literal-suffix,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -bugprone-easily-swappable-parameters
 WarningsAsErrors: 'bugprone-*,clang-analyzer-*'

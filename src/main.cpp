@@ -1,6 +1,5 @@
 ﻿#include "app/app.hpp"
 
-
 #include <spdlog/spdlog.h>
 
 
