@@ -1,9 +1,9 @@
 #include "renderer.hpp"
 
+#include "app/scene.hpp"
 #include "emitter/emitter.hpp"
 #include "utils/opengl.hpp"
 #include "utils/shader_cache.hpp"
-#include "utils/utils.hpp"
 
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,25 +11,22 @@
 #include <imgui.h>
 #include <spdlog/spdlog.h>
 #include <algorithm>
-#include <chrono>
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
-#include <filesystem>
 
 namespace
 {
 
 constexpr std::size_t BufferCount {3};
 
-GLuint      splatProgram;    // compute: particle positions -> density image
-GLuint      resolveProgram;  // fullscreen: density image -> color
-GLuint      fullscreenVAO;   // empty VAO, fullscreen triangle uses gl_VertexID
+GLuint      splatProgram;   // compute: particle positions -> density image
+GLuint      resolveProgram; // fullscreen: density image -> color
+GLuint      fullscreenVAO;  // empty VAO, fullscreen triangle uses gl_VertexID
 GLuint      densityTexture;
-GLuint      hueTexture; // density-weighted hue sum, resolved against densityTexture
 GLuint      particleSSBO[BufferCount];
-GLuint      ageSSBO[BufferCount];
 void*       mappedPtr[BufferCount];
-void*       ageMappedPtr[BufferCount];
 GLsync      fences[BufferCount] = {};
 std::size_t currentBuffer       = 0;
 
@@ -58,8 +55,6 @@ GLuint createUintTexture(int w, int h)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     return texture;
 }
-
-std::filesystem::path resource_string = PARTICLES_STRINGIFY(RESOURCE_DIR);
 
 constexpr glm::vec3 kOrbitTarget {0.0F, 0.0F, 0.0F};
 constexpr glm::vec3 kWorldUp {0.0F, 1.0F, 0.0F};
@@ -91,7 +86,7 @@ glm::vec3 Camera::up() const noexcept
 
 glm::vec3 Camera::eye() const noexcept
 {
-    float standoff = (projection == Projection::Orthographic) ? kOrthoStandoff : distance;
+    float standoff = (projection == Projection::Orthographic)? kOrthoStandoff : distance;
     return kOrbitTarget - (forward() * standoff);
 }
 
@@ -133,15 +128,10 @@ Renderer::~Renderer()
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, particleSSBO[i]);
         glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ageSSBO[i]);
-        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     }
 
     glDeleteBuffers(BufferCount, particleSSBO);
-    glDeleteBuffers(BufferCount, ageSSBO);
     glDeleteTextures(1, &densityTexture);
-    glDeleteTextures(1, &hueTexture);
     glDeleteVertexArrays(1, &fullscreenVAO);
 }
 
@@ -157,30 +147,33 @@ Renderer::Renderer()
     depthFalloffLoc_   = glGetUniformLocation(splatProgram, "depthFalloff");
     depthReferenceLoc_ = glGetUniformLocation(splatProgram, "depthReference");
     viewRowZLoc_       = glGetUniformLocation(splatProgram, "viewRowZ");
-    elapsedTimeLoc_    = glGetUniformLocation(splatProgram, "elapsedTime");
-    cycleRateLoc_      = glGetUniformLocation(splatProgram, "colorCycleRate");
+    particleRadiusLoc_ = glGetUniformLocation(splatProgram, "particleRadius");
 
     colorLoc_          = glGetUniformLocation(resolveProgram, "particleColor");
     densitySamplerLoc_ = glGetUniformLocation(resolveProgram, "densityImage");
-    hueSamplerLoc_     = glGetUniformLocation(resolveProgram, "hueImage");
     fadeLoc_           = glGetUniformLocation(resolveProgram, "fadeScale");
-    paletteALoc_       = glGetUniformLocation(resolveProgram, "paletteA");
-    paletteBLoc_       = glGetUniformLocation(resolveProgram, "paletteB");
-    paletteCLoc_       = glGetUniformLocation(resolveProgram, "paletteC");
-    paletteDLoc_       = glGetUniformLocation(resolveProgram, "paletteD");
-    colorMixLoc_       = glGetUniformLocation(resolveProgram, "colorMix");
-    coreWhitenLoc_     = glGetUniformLocation(resolveProgram, "coreWhiten");
+
+    std::array<GLint, 3> maxGroups {};
+    for (GLuint dim = 0; dim < maxGroups.size(); ++dim) {
+        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, dim, &maxGroups[dim]);
+    }
+
+    maxWorkGroups_ = static_cast<GLuint>(maxGroups[0]);
+    spdlog::info(
+        "max compute work groups: {} x {} x {} ({} particles per dispatch axis)",
+        maxGroups[0],
+        maxGroups[1],
+        maxGroups[2],
+        static_cast<std::uint64_t>(maxWorkGroups_) * 256U);
 
     // Fullscreen triangle needs no vertex data at all — gl_VertexID drives it.
     glGenVertexArrays(1, &fullscreenVAO);
 
     // --- Particle storage buffers, persistent-mapped, used as SSBOs now ---
     glGenBuffers(BufferCount, particleSSBO);
-    glGenBuffers(BufferCount, ageSSBO);
 
     for (std::size_t i = 0; i < BufferCount; ++i) {
-        mappedPtr[i]    = createMappedStorage(particleSSBO[i], MAX_PARTICLES * sizeof(ParticleVector));
-        ageMappedPtr[i] = createMappedStorage(ageSSBO[i], MAX_PARTICLES * sizeof(float));
+        mappedPtr[i] = createMappedStorage(particleSSBO[i], MAX_PARTICLES * sizeof(ParticleVector));
     }
 
     texW_ = 0; // force creation on first frame
@@ -196,32 +189,32 @@ void Renderer::resizeDensityTexture(int w, int h)
     texW_ = w;
     texH_ = h;
 
-    if (densityTexture) {
+    if (densityTexture != 0) {
         glDeleteTextures(1, &densityTexture);
-        glDeleteTextures(1, &hueTexture);
     }
 
     densityTexture = createUintTexture(w, h);
-    hueTexture     = createUintTexture(w, h);
 }
 
-void Renderer::render(GLFWwindow* window)
+void Renderer::renderSettings(float dt)
 {
-    static auto t1 = Time::measure();
-    auto        t2 = Time::measure();
-    double      dt = std::max(0.01, (double)Time::duration<std::chrono::nanoseconds>(t1, t2).count());
-    t1  = t2;
-    dt /= 1e9;
-
-    elapsedTime_ += dt;
-
-    ImGui::Begin("Particle Settings");
-    ImGui::Text("FPS: %f", 1.0 / dt);
+    ImGui::Begin("Renderer");
+    ImGui::Text("FPS: %f", 1.0F / dt);
     ImGui::Text("DT: %f", dt);
-    static float fadeScale = 0.15f;
-    ImGui::SliderFloat("Density fade", &fadeScale, 0.01f, 1.0f);
+    ImGui::SliderFloat("Density fade", &fadeScale_, 0.01F, 1.0F);
+    ImGui::ColorEdit4("Particle color", glm::value_ptr(particleColor_));
+
+    ImGui::SliderInt("Particle size", &particleRadius_, 0, 8, "%d px radius");
+    ImGui::SetItemTooltip(
+        "0 = one pixel per particle.\n"
+        "Cost is quadratic: every pixel of the disc is an atomic add,\n"
+        "so radius 4 is ~50x the splat work of radius 0.");
+
+    ImGui::SliderFloat("Depth falloff", &depthFalloff_, 0.0F, 3.0F);
+    ImGui::SetItemTooltip(
+        "0 = flat, 1 = 1/depth, 2 = inverse-square.\n"
+        "Near-flat in 2D: a parallel projection has no distance attenuation.");
     ImGui::End();
-    emitter.renderSettings();
 
     ImGui::Begin("Camera");
 
@@ -253,11 +246,13 @@ void Renderer::render(GLFWwindow* window)
         camera_.yaw   = 0.0F;
         camera_.pitch = glm::radians(89.0F);
     }
+
     ImGui::SameLine();
     if (ImGui::Button("Front")) {
         camera_.yaw   = 0.0F;
         camera_.pitch = 0.0F;
     }
+
     ImGui::SameLine();
     if (ImGui::Button("Side")) {
         camera_.yaw   = glm::radians(90.0F);
@@ -269,96 +264,68 @@ void Renderer::render(GLFWwindow* window)
     ImGui::SliderFloat("Distance", &camera_.distance, 0.1F, 20.0F);
     ImGui::SetItemTooltip("In 2D this scales the view box rather than moving the eye");
     ImGui::SliderFloat("FOV", &camera_.fovDegrees, 10.0F, 120.0F, "%.0f deg");
-    static bool autoOrbit = false;
-    ImGui::Checkbox("Auto orbit", &autoOrbit);
+    ImGui::Checkbox("Auto orbit", &autoOrbit_);
     ImGui::End();
 
-    static float depthFalloff = 1.5F;
-
-    ImGui::Begin("Nebula");
-    ImGui::SliderFloat("Depth falloff", &depthFalloff, 0.0F, 3.0F);
-    ImGui::SetItemTooltip(
-        "0 = flat, 1 = 1/depth, 2 = inverse-square.\n"
-        "Near-flat in 2D: a parallel projection has no distance attenuation.");
-    ImGui::SliderFloat("Color cycle", &palette_.cycleRate, 0.0F, 0.5F, "%.3f rev/s");
-    ImGui::SliderFloat("Color mix", &palette_.mix, 0.0F, 1.0F);
-    ImGui::SliderFloat("Core whiten", &palette_.coreWhiten, 0.0F, 1.0F);
-
-    if (ImGui::TreeNode("Gradient (a + b*cos(2pi*(c*t + d)))")) {
-        ImGui::DragFloat3("a  midpoint", glm::value_ptr(palette_.a), 0.01F, 0.0F, 1.0F);
-        ImGui::DragFloat3("b  amplitude", glm::value_ptr(palette_.b), 0.01F, 0.0F, 1.0F);
-        ImGui::DragFloat3("c  frequency", glm::value_ptr(palette_.c), 0.01F, 0.0F, 4.0F);
-        ImGui::DragFloat3("d  phase", glm::value_ptr(palette_.d), 0.01F, 0.0F, 1.0F);
-
-        // Strip of the gradient itself, so tweaking the coefficients is not blind.
-        ImDrawList* draw  = ImGui::GetWindowDrawList();
-        ImVec2      start = ImGui::GetCursorScreenPos();
-        float       width = ImGui::GetContentRegionAvail().x;
-
-        constexpr int kSteps = 64;
-        for (int i = 0; i < kSteps; ++i) {
-            float     t   = (float)i / (float)kSteps;
-            glm::vec3 rgb = palette_.a + palette_.b * glm::cos(6.28318530718F * ((palette_.c * t) + palette_.d));
-            rgb           = glm::clamp(rgb, 0.0F, 1.0F);
-
-            float x0 = start.x + (width * t);
-            float x1 = start.x + (width * ((float)(i + 1) / (float)kSteps));
-            draw->AddRectFilled({x0, start.y}, {x1, start.y + 24.0F}, ImGui::ColorConvertFloat4ToU32({rgb.r, rgb.g, rgb.b, 1.0F}));
-        }
-
-        ImGui::Dummy({width, 24.0F});
-        ImGui::TreePop();
+    if (autoOrbit_) {
+        camera_.yaw = std::fmod(camera_.yaw + (dt * 0.4F), 6.28318530718F);
     }
-    ImGui::End();
+}
 
-    if (autoOrbit) {
-        camera_.yaw = std::fmod(camera_.yaw + ((float)dt * 0.4F), 6.28318530718F);
+void Renderer::spawnFromMouse(Scene& scene, glm::mat4 const& viewProj, int w, int h, float dt)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse || !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        return;
     }
 
-    int w, h;
+    ImVec2               mouse    = ImGui::GetMousePos();
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    float                local_x  = mouse.x - viewport->Pos.x;
+    float                local_y  = mouse.y - viewport->Pos.y;
+
+    float ndc_x = ((2.0F * local_x) / (float)w) - 1.0F;
+    float ndc_y = 1.0F - ((2.0F * local_y) / (float)h);
+
+    // Cast a ray through the cursor and land it on the plane that passes through
+    // the orbit target facing the camera, so clicks always spawn in view.
+    glm::mat4 invViewProj = glm::inverse(viewProj);
+    glm::vec4 nearPoint   = invViewProj * glm::vec4(ndc_x, ndc_y, -1.0F, 1.0F);
+    glm::vec4 farPoint    = invViewProj * glm::vec4(ndc_x, ndc_y, 1.0F, 1.0F);
+    nearPoint /= nearPoint.w;
+    farPoint  /= farPoint.w;
+
+    glm::vec3 origin  = glm::vec3(nearPoint);
+    glm::vec3 ray     = glm::normalize(glm::vec3(farPoint - nearPoint));
+    glm::vec3 forward = camera_.forward();
+
+    float denom = glm::dot(ray, forward);
+    if (std::abs(denom) <= 1e-6F) {
+        return;
+    }
+
+    float t = glm::dot(kOrbitTarget - origin, forward) / denom;
+    if (t > 0.0F) {
+        scene.spawn(
+            {.origin = origin + (ray * t),
+             .right  = camera_.right(),
+             .up     = camera_.up(),
+             .planar = planarEmission_},
+            dt);
+    }
+}
+
+void Renderer::render(GLFWwindow* window, Scene& scene, float dt)
+{
+    renderSettings(dt);
+
+    int w = 0;
+    int h = 0;
     glfwGetFramebufferSize(window, &w, &h);
-    float     aspect   = (h > 0) ? (float)w / (float)h : 1.0F;
+    float     aspect   = (h > 0)? (float)w / (float)h : 1.0F;
     glm::mat4 viewProj = camera_.viewProj(aspect);
 
-    ImGuiIO& io = ImGui::GetIO();
-    if (!io.WantCaptureMouse && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-        ImVec2               mouse    = ImGui::GetMousePos();
-        const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        float                local_x  = mouse.x - viewport->Pos.x;
-        float                local_y  = mouse.y - viewport->Pos.y;
-
-        float ndc_x = (2.0f * local_x) / w - 1.0f;
-        float ndc_y = 1.0f - (2.0f * local_y) / h;
-
-        // Cast a ray through the cursor and land it on the plane that passes through
-        // the orbit target facing the camera, so clicks always spawn in view.
-        glm::mat4 invViewProj = glm::inverse(viewProj);
-        glm::vec4 nearPoint   = invViewProj * glm::vec4(ndc_x, ndc_y, -1.0F, 1.0F);
-        glm::vec4 farPoint    = invViewProj * glm::vec4(ndc_x, ndc_y, 1.0F, 1.0F);
-        nearPoint /= nearPoint.w;
-        farPoint  /= farPoint.w;
-
-        glm::vec3 origin  = glm::vec3(nearPoint);
-        glm::vec3 ray     = glm::normalize(glm::vec3(farPoint - nearPoint));
-        glm::vec3 forward = camera_.forward();
-
-        float denom = glm::dot(ray, forward);
-        if (std::abs(denom) > 1e-6F) {
-            float t = glm::dot(kOrbitTarget - origin, forward) / denom;
-            if (t > 0.0F) {
-                emitter.spawn(
-                    {.origin = origin + (ray * t),
-                     .right  = camera_.right(),
-                     .up     = camera_.up(),
-                     .planar = planarEmission_},
-                    (float)dt);
-            }
-        }
-    }
-
-    auto t_start = Time::measure();
-    emitter.update(dt);
-    auto t_update = Time::measure();
+    spawnFromMouse(scene, viewProj, w, h, dt);
 
     resizeDensityTexture(w, h);
 
@@ -373,19 +340,14 @@ void Renderer::render(GLFWwindow* window)
         fences[currentBuffer] = nullptr;
     }
 
-    // auto [data, length] = emitter.cull(1.f/1000.0);
-    auto data   = emitter.data();
-    auto length = emitter.aliveCount();
-    std::memcpy(mappedPtr[currentBuffer], data, length * sizeof(ParticleVector));
-    std::memcpy(ageMappedPtr[currentBuffer], emitter.ages(), length * sizeof(float));
-    auto t_upload = Time::measure();
+    auto positions = scene.positions();
+    std::memcpy(mappedPtr[currentBuffer], positions.data(), positions.size() * sizeof(ParticleVector));
 
-    GLuint count = static_cast<GLuint>(emitter.aliveCount());
+    GLuint count = static_cast<GLuint>(positions.size());
 
-    // --- Clear accumulation textures ---
+    // --- Clear the accumulation texture ---
     static const GLuint zero = 0;
     glClearTexImage(densityTexture, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
-    glClearTexImage(hueTexture, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
 
     // --- Splat pass: compute shader, one thread per particle ---
     glUseProgram(splatProgram);
@@ -397,59 +359,43 @@ void Renderer::render(GLFWwindow* window)
     // cloud at full brightness no matter how far the camera pulls back.
     glm::mat4 view = camera_.view();
 
-    glUniform1f(depthFalloffLoc_, depthFalloff);
+    glUniform1f(depthFalloffLoc_, depthFalloff_);
     glUniform1f(depthReferenceLoc_, camera_.depthReference());
     glUniform4f(viewRowZLoc_, view[0][2], view[1][2], view[2][2], view[3][2]);
-    glUniform1f(elapsedTimeLoc_, (float)elapsedTime_);
-    glUniform1f(cycleRateLoc_, palette_.cycleRate);
+    glUniform1i(particleRadiusLoc_, particleRadius_);
 
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, particleSSBO[currentBuffer]);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ageSSBO[currentBuffer]);
     glBindImageTexture(1, densityTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
-    glBindImageTexture(3, hueTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
 
     constexpr GLuint kLocalSize = 256;
     GLuint           groups     = (count + kLocalSize - 1) / kLocalSize;
     if (groups > 0) {
-        glDispatchCompute(groups, 1, 1);
+        // A dispatch is capped per dimension — 65535 on any D3D12-backed driver, which
+        // is only ~16.7M particles down a single axis. Past the cap the driver rejects
+        // the whole dispatch with GL_INVALID_VALUE and splats nothing, so the screen
+        // goes black instead of degrading. Folding the excess into Y buys 65535x room;
+        // the shader linearizes the grid back into a particle index.
+        GLuint groupsX = std::min(groups, maxWorkGroups_);
+        GLuint groupsY = (groups + groupsX - 1) / groupsX;
+        glDispatchCompute(groupsX, groupsY, 1);
     }
 
-    // Make sure the atomic writes are visible before the resolve pass reads them.
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+    // Make sure the atomic writes are visible before the resolve pass reads them, and
+    // before next frame's glClearTexImage overwrites them — image stores are incoherent
+    // in both directions.
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT | GL_TEXTURE_UPDATE_BARRIER_BIT);
 
     // --- Resolve pass: one fullscreen triangle, density -> color ---
-    static ImVec4 color = ImVec4(1.0f, 0.6f, 0.2f, 1.0f);
-
     glUseProgram(resolveProgram);
-    glUniform4f(colorLoc_, color.x, color.y, color.z, color.w);
-    glUniform1f(fadeLoc_, fadeScale);
-
-    glUniform3fv(paletteALoc_, 1, glm::value_ptr(palette_.a));
-    glUniform3fv(paletteBLoc_, 1, glm::value_ptr(palette_.b));
-    glUniform3fv(paletteCLoc_, 1, glm::value_ptr(palette_.c));
-    glUniform3fv(paletteDLoc_, 1, glm::value_ptr(palette_.d));
-    glUniform1f(colorMixLoc_, palette_.mix);
-    glUniform1f(coreWhitenLoc_, palette_.coreWhiten);
+    glUniform4fv(colorLoc_, 1, glm::value_ptr(particleColor_));
+    glUniform1f(fadeLoc_, fadeScale_);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, densityTexture);
     glUniform1i(densitySamplerLoc_, 0);
 
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, hueTexture);
-    glUniform1i(hueSamplerLoc_, 1);
-
     glBindVertexArray(fullscreenVAO);
     glDrawArrays(GL_TRIANGLES, 0, 3);
-
-    glFinish();
-    auto t_draw = Time::measure();
-
-    spdlog::info(
-        "update: {}ms  upload: {}ms  splat+draw: {}ms",
-        Time::duration<std::chrono::microseconds>(t_start, t_update).count() / 1000.0,
-        Time::duration<std::chrono::microseconds>(t_update, t_upload).count() / 1000.0,
-        Time::duration<std::chrono::microseconds>(t_upload, t_draw).count() / 1000.0);
 
     fences[currentBuffer] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 }

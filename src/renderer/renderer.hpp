@@ -1,27 +1,14 @@
 #ifndef YARR_RENDERER_HPP
 #define YARR_RENDERER_HPP
 
-#include "emitter/emitter.hpp"
-#include <GL/glew.h> // or whatever GL loader you use
-#include <GLFW/glfw3.h>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float3.hpp>
+#include <glm/ext/vector_float4.hpp>
+#include <GL/glew.h> // or whatever GL loader you use
+#include <GLFW/glfw3.h>
 #include <cstdint>
 
-// Cosine gradient (color = a + b*cos(2pi*(c*t + d))) driven by particle spawn time.
-// The defaults sweep deep blue -> pale blue-white -> rose -> plum, the palette real
-// colored space imagery tends to land in.
-struct NebulaPalette
-{
-    glm::vec3 a {0.55F, 0.50F, 0.68F}; // midpoint
-    glm::vec3 b {0.35F, 0.30F, 0.32F}; // amplitude
-    glm::vec3 c {1.00F, 1.00F, 1.00F}; // frequency
-    glm::vec3 d {0.55F, 0.62F, 0.78F}; // phase
-
-    float cycleRate {0.08F}; // full color revolutions per second of spawning
-    float mix {1.0F};        // 0 = flat particleColor, 1 = full gradient
-    float coreWhiten {0.6F}; // how much the densest cores blow out toward white
-};
+class Scene;
 
 enum class Projection : std::uint8_t
 {
@@ -61,41 +48,51 @@ public:
     Renderer();
     ~Renderer();
 
-    void render(GLFWwindow* window);
+    // Draws whatever the scene currently holds, and feeds mouse spawns back into it —
+    // the camera basis a burst is emitted along only exists on this side.
+    void render(GLFWwindow* window, Scene& scene, float dt);
 
 private:
     void resizeDensityTexture(int w, int h);
+    void renderSettings(float dt);
+    void spawnFromMouse(Scene& scene, glm::mat4 const& viewProj, int w, int h, float dt);
 
-    GLint pointSizeLoc_ {-1}; // kept for compatibility, unused now
-    GLint colorLoc_ {-1};
-    GLint splatColorLoc_ {-1};
+    // Splat pass
     GLint particleCountLoc_ {-1};
     GLint screenSizeLoc_ {-1};
     GLint viewProjLoc_ {-1};
     GLint depthFalloffLoc_ {-1};
     GLint depthReferenceLoc_ {-1};
     GLint viewRowZLoc_ {-1};
-    GLint elapsedTimeLoc_ {-1};
-    GLint cycleRateLoc_ {-1};
+    GLint particleRadiusLoc_ {-1};
 
+    // Resolve pass
     GLint densitySamplerLoc_ {-1};
-    GLint hueSamplerLoc_ {-1};
+    GLint colorLoc_ {-1};
     GLint fadeLoc_ {-1};
-    GLint paletteALoc_ {-1};
-    GLint paletteBLoc_ {-1};
-    GLint paletteCLoc_ {-1};
-    GLint paletteDLoc_ {-1};
-    GLint colorMixLoc_ {-1};
-    GLint coreWhitenLoc_ {-1};
 
     int texW_ {0};
     int texH_ {0};
 
-    bool          planarEmission_ {false};
-    double        elapsedTime_ {0.0};
-    Camera        camera_;
-    NebulaPalette palette_;
-    Emitter       emitter;
+    // Per-dimension dispatch cap the driver reports. The spec floor is 65535, which is
+    // also exactly what D3D12-backed drivers give, and this system routinely wants more
+    // groups than that — see the dispatch in render().
+    GLuint maxWorkGroups_ {65535};
+
+    Camera camera_;
+
+    // Emission is confined to the plane facing the camera, so it follows the projection
+    // by default but stays independently overridable.
+    bool planarEmission_ {false};
+    bool autoOrbit_ {false};
+
+    float     fadeScale_ {0.15F};
+    float     depthFalloff_ {1.5F};
+    glm::vec4 particleColor_ {1.0F, 0.6F, 0.2F, 1.0F};
+
+    // Splat radius in pixels. Every pixel of the disc is an atomic add, so the cost is
+    // quadratic here and linear in the particle count.
+    int particleRadius_ {1};
 };
 
 #endif // YARR_RENDERER_HPP

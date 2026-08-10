@@ -2,6 +2,7 @@
 #define YARR_APP_APP_HPP
 
 #include "app/console.hpp"
+#include "app/scene.hpp"
 #include "renderer/renderer.hpp"
 
 #include <GLFW/glfw3.h>
@@ -25,6 +26,7 @@ private:
 
     GLFWwindow*   window;
     Renderer*     renderer;
+    Scene         scene;
     OutputConsole console;
 };
 

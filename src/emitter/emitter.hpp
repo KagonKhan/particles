@@ -11,6 +11,7 @@
 
 #include <array>
 #include <cstddef>
+#include <span>
 
 
 static constexpr std::size_t MAX_PARTICLES = 100'000'000;
@@ -48,11 +49,11 @@ public:
     void renderSettings();
 
 
-    [[nodiscard]] std::size_t           aliveCount() const noexcept { return aliveCount_; }
-    [[nodiscard]] ParticleVector const* data() const noexcept       { return pool_.positions.data(); }
+    [[nodiscard]] std::span<const ParticleVector> data() const noexcept
+    {
+        return {pool_.positions.data(), aliveCount_};
+    }
 
-    // Ages are swap-removed alongside positions, so index i refers to the same
-    // particle in both. The renderer turns age back into an absolute spawn time.
     [[nodiscard]] float const* ages() const noexcept { return pool_.ages.data(); }
 
 

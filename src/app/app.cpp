@@ -6,6 +6,7 @@
 #include "utils/utils.hpp"
 
 #include <spdlog/spdlog.h>
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 
@@ -134,10 +135,20 @@ App::~App()
 
 void App::run(int fps)
 {
+    auto previousFrame = Time::measure();
+
     while (!glfwWindowShouldClose(window)) {
         glClearColor(0.0, 0.0, 0.0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
-        auto t1 = Time::measure();
+
+        // Floored, so a frame the clock reports as instantaneous cannot divide by zero
+        // in the FPS readout or stall the spawn accumulator.
+        auto  now = Time::measure();
+        float dt  = std::max(
+            1e-6F,
+            static_cast<float>(Time::duration<std::chrono::nanoseconds>(previousFrame, now).count()) / 1e9F);
+        previousFrame = now;
+
         glfwPollEvents();
         if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0) {
             ImGui_ImplGlfw_Sleep(10);
@@ -157,7 +168,12 @@ void App::run(int fps)
         ImGuiID dockspace_id = ImGui::GetID("RootDockSpace");
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
-        renderer->render(window);
+        // Simulate first, then draw: the renderer's mouse spawns land in the pool the
+        // same frame they are made, rather than waiting a frame to appear.
+        scene.update(dt);
+        scene.renderSettings();
+
+        renderer->render(window, scene, dt);
 
         ImGui::Begin("Console Log");
         console.render();

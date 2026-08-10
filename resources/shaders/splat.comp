@@ -10,13 +10,7 @@ layout(std430, binding = 0) readonly buffer Particles
     float positions[]; // world space, xyz per particle
 };
 
-layout(std430, binding = 2) readonly buffer Ages
-{
-    float ages[]; // seconds since spawn, same index order as positions
-};
-
 layout(r32ui, binding = 1) uniform uimage2D densityImage;
-layout(r32ui, binding = 3) uniform uimage2D hueImage;
 
 uniform uint particleCount;
 uniform ivec2 screenSize;
@@ -26,8 +20,7 @@ uniform float depthFalloff;   // 0 = flat, 1 = 1/depth, 2 = inverse-square
 uniform float depthReference; // depth at which a particle contributes exactly 1.0
 uniform vec4 viewRowZ;        // third row of the view matrix, see below
 
-uniform float elapsedTime;    // seconds since startup
-uniform float colorCycleRate; // hue revolutions per second of spawn time
+uniform int particleRadius;   // splat radius in pixels; 0 writes a single pixel
 
 // The density image holds integers, so weighted contributions are accumulated as
 // fixed point: one unit of density is kDensityScale counts. density.frag divides
@@ -38,9 +31,12 @@ const float kMaxWeight    = 4.0; // caps how bright a near particle can get, and
 
 void main()
 {
-    uint idx = gl_GlobalInvocationID.x;
+    // The dispatch is a 2D grid of 1D groups, because one dimension caps at 65535 groups
+    // on D3D12-backed drivers — only ~16.7M particles, which this system passes easily.
+    // Row Y covers gl_NumWorkGroups.x groups, hence the stride.
+    uint idx = (gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x) + gl_GlobalInvocationID.x;
     if (idx >= particleCount) {
-        return;
+        return; // ragged tail of the last row
     }
 
     uint base  = idx * 3u;
@@ -52,13 +48,24 @@ void main()
     }
 
     vec3 ndc = clip.xyz / clip.w;
-    if (any(greaterThan(abs(ndc), vec3(1.0)))) {
-        return; // outside the frustum
+    if (abs(ndc.z) > 1.0) {
+        return; // outside the depth range
     }
 
-    // NDC [-1,1] -> pixel coords [0, screenSize)
-    ivec2 pixel = ivec2((ndc.xy * 0.5 + 0.5) * vec2(screenSize));
-    pixel       = clamp(pixel, ivec2(0), screenSize - 1);
+    // Off-screen by less than the splat radius still puts part of the disc on screen, so
+    // the frustum test is widened by exactly that much — otherwise discs pop into
+    // existence at the frame edge instead of sliding in.
+    vec2 slack = (vec2(float(particleRadius)) / vec2(screenSize)) * 2.0;
+    if (any(greaterThan(abs(ndc.xy), vec2(1.0) + slack))) {
+        return;
+    }
+
+    // NDC [-1,1] -> pixel coords [0, screenSize). Deliberately not clamped: a particle
+    // inside the slack band above lies outside the image, and clamping would pile every
+    // one of them onto the border pixel. The per-write bounds test below is the guard.
+    // floor, not a plain cast: the slack band produces negative coordinates, and a cast
+    // truncates those toward zero, sliding the disc a pixel inward at the left and top.
+    ivec2 pixel = ivec2(floor((ndc.xy * 0.5 + 0.5) * vec2(screenSize)));
 
     // Distance along the camera's forward axis. Taking it from the view matrix rather
     // than from clip.w is what lets one shader serve both projections: clip.w is the
@@ -72,21 +79,31 @@ void main()
     float weight = pow(depthReference / max(depth, 1e-3), depthFalloff);
     weight       = clamp(weight, 0.0, kMaxWeight);
 
-    // Floor at one quantum so a distant cloud still accumulates into a haze rather
-    // than rounding away to nothing particle by particle.
-    uint contribution = max(uint(weight * float(kDensityScale)), 1u);
+    // Splat a disc rather than a single pixel. Cost is quadratic in the radius — every
+    // pixel of it is an atomic — so this is the one setting that can sink the frame
+    // rate on its own at high particle counts.
+    int radius = particleRadius;
 
-    // Absolute spawn time, so a burst emitted at one moment keeps its color for life
-    // instead of every particle marching through the same gradient as it ages.
-    float spawnTime = elapsedTime - ages[idx];
-    float hue       = fract(spawnTime * colorCycleRate);
+    for (int dy = -radius; dy <= radius; ++dy) {
+        for (int dx = -radius; dx <= radius; ++dx) {
+            float dist = sqrt(float((dx * dx) + (dy * dy)));
+            if (dist > float(radius)) {
+                continue; // round splat, not square
+            }
 
-    // Accumulating hue*contribution alongside contribution lets the resolve pass
-    // recover a density-weighted average hue with one divide. The fixed-point scale
-    // is present in both sums, so it cancels out.
-    // Rounding rather than truncating matters at the faint end: a distant particle
-    // contributes a single quantum, and truncation would drag every one of them to
-    // hue 0 instead of averaging out across the cloud.
-    imageAtomicAdd(densityImage, pixel, contribution);
-    imageAtomicAdd(hueImage, pixel, uint((hue * float(contribution)) + 0.5));
+            ivec2 target = pixel + ivec2(dx, dy);
+            if (any(lessThan(target, ivec2(0))) || any(greaterThanEqual(target, screenSize))) {
+                continue;
+            }
+
+            // Linear falloff to the rim. Dividing by radius+1 rather than radius keeps
+            // the rim just above zero, and leaves radius 0 at full weight.
+            float falloff = 1.0 - (dist / float(radius + 1));
+
+            // Floor at one quantum so a distant cloud still accumulates into a haze
+            // rather than rounding away to nothing particle by particle.
+            uint contribution = max(uint(weight * falloff * float(kDensityScale)), 1u);
+            imageAtomicAdd(densityImage, target, contribution);
+        }
+    }
 }
