@@ -36,6 +36,9 @@ add_executable(${PROJECT}
 
     src/renderer/image.cpp
     src/renderer/renderer.cpp
+    src/renderer/particle_buffer.cpp
+    src/renderer/point_pipeline.cpp
+    src/renderer/splat_pipeline.cpp
 
     src/utils/logger.cpp
     src/utils/shader_cache.cpp

@@ -60,7 +60,7 @@ App::App(std::string const& title)
 
     glfwSwapInterval(0);
     // glfwSwapInterval(1); // Enable vsync
-
+    glEnable(GL_BLEND);
 
     // ===   IMGUI INITIALIZATION   ====================================================================================
     IMGUI_CHECKVERSION();
@@ -88,6 +88,24 @@ App::App(std::string const& title)
 
 
     // ===   SHADER INITIALIZATION   ===================================================================================
+    ShaderCache::compileProgram(
+        "PointProgram",
+        {
+            ShaderCache::load(
+                "point_vertex",
+                {
+                    .source = resource_string / "shaders/point.vert",
+                    .type   = GL_VERTEX_SHADER
+                }),
+            ShaderCache::load(
+                "point_fragment",
+                {
+                    .source = resource_string / "shaders/point.frag",
+                    .type   = GL_FRAGMENT_SHADER
+                }),
+        }
+    );
+
     ShaderCache::compileProgram(
         "SplatProgram",
         {

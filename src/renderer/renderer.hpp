@@ -1,9 +1,13 @@
 #ifndef YARR_RENDERER_HPP
 #define YARR_RENDERER_HPP
 
+#include "renderer/particle_buffer.hpp"
+#include "renderer/point_pipeline.hpp"
+#include "renderer/render_view.hpp"
+#include "renderer/splat_pipeline.hpp"
+
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float3.hpp>
-#include <glm/ext/vector_float4.hpp>
 #include <GL/glew.h> // or whatever GL loader you use
 #include <GLFW/glfw3.h>
 #include <cstdint>
@@ -14,6 +18,13 @@ enum class Projection : std::uint8_t
 {
     Perspective,  // 3D
     Orthographic, // 2D — parallel projection, no foreshortening
+};
+
+// Which pipeline gets to draw the particle buffer this frame.
+enum class RenderMode : std::uint8_t
+{
+    Points, // one GL_POINTS draw, the plain path
+    Splat,  // compute-accumulated density, the heavy path
 };
 
 // Orbits the origin, which is where the emitter's spawn plane sits.
@@ -36,63 +47,41 @@ struct Camera
     [[nodiscard]] glm::mat4 view() const noexcept;
     [[nodiscard]] glm::mat4 viewProj(float aspect) const noexcept;
 
-    // Depth at which a particle should render at full brightness. Tracks the orbit
-    // distance in 3D; in 2D it tracks the fixed standoff, which leaves the depth
-    // weighting near-flat — the physically right answer for a parallel projection.
+    // Depth at which a particle should render at its nominal size and brightness.
+    // Tracks the orbit distance in 3D; in 2D it tracks the fixed standoff, which leaves
+    // the depth weighting near-flat — the right answer for a parallel projection.
     [[nodiscard]] float depthReference() const noexcept;
+
+    // Everything a pipeline needs from this camera, and nothing more.
+    [[nodiscard]] RenderView renderView(float aspect) const noexcept;
 };
 
+// Points a camera at a scene, streams it to the GPU once, and hands it to whichever
+// pipeline is active. Owns no GL state of its own beyond the shared particle buffer.
 class Renderer
 {
 public:
-    Renderer();
-    ~Renderer();
-
-    // Draws whatever the scene currently holds, and feeds mouse spawns back into it —
-    // the camera basis a burst is emitted along only exists on this side.
+    // Feeds mouse spawns back into the scene — the camera basis a burst is emitted
+    // along only exists on this side.
     void render(GLFWwindow* window, Scene& scene, float dt);
 
 private:
-    void resizeDensityTexture(int w, int h);
     void renderSettings(float dt);
     void spawnFromMouse(Scene& scene, glm::mat4 const& viewProj, int w, int h, float dt);
 
-    // Splat pass
-    GLint particleCountLoc_ {-1};
-    GLint screenSizeLoc_ {-1};
-    GLint viewProjLoc_ {-1};
-    GLint depthFalloffLoc_ {-1};
-    GLint depthReferenceLoc_ {-1};
-    GLint viewRowZLoc_ {-1};
-    GLint particleRadiusLoc_ {-1};
+    Camera     camera_;
+    RenderMode mode_ {RenderMode::Points};
 
-    // Resolve pass
-    GLint densitySamplerLoc_ {-1};
-    GLint colorLoc_ {-1};
-    GLint fadeLoc_ {-1};
-
-    int texW_ {0};
-    int texH_ {0};
-
-    // Per-dimension dispatch cap the driver reports. The spec floor is 65535, which is
-    // also exactly what D3D12-backed drivers give, and this system routinely wants more
-    // groups than that — see the dispatch in render().
-    GLuint maxWorkGroups_ {65535};
-
-    Camera camera_;
+    // One upload per frame, shared by both pipelines: at MAX_PARTICLES the storage runs
+    // to gigabytes, so a private copy per pipeline is not on the table.
+    ParticleBuffer particles_;
+    PointPipeline  points_;
+    SplatPipeline  splat_;
 
     // Emission is confined to the plane facing the camera, so it follows the projection
     // by default but stays independently overridable.
     bool planarEmission_ {false};
     bool autoOrbit_ {false};
-
-    float     fadeScale_ {0.15F};
-    float     depthFalloff_ {1.5F};
-    glm::vec4 particleColor_ {1.0F, 0.6F, 0.2F, 1.0F};
-
-    // Splat radius in pixels. Every pixel of the disc is an atomic add, so the cost is
-    // quadratic here and linear in the particle count.
-    int particleRadius_ {1};
 };
 
 #endif // YARR_RENDERER_HPP

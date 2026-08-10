@@ -23,6 +23,11 @@ void main()
     // Exponential falloff: dense clusters glow toward full opacity,
     // sparse areas stay faint. Tune fadeScale to taste.
     float intensity = 1.0 - exp(-count * fadeScale);
-
-    fragColor = vec4(particleColor.rgb, particleColor.a * intensity);
+// Premultiplied alpha: rgb is already scaled by coverage, which is what
+    // GL_ONE / GL_ONE_MINUS_SRC_ALPHA expects. It also makes this pass degrade
+    // gracefully — composited over a black clear, the result is identical whether
+    // blending is on or off, so a lost blend state dims to correct instead of
+    // blowing out to flat color.
+    float coverage = particleColor.a * intensity;
+    fragColor = vec4(particleColor.rgb * coverage, coverage);
 }

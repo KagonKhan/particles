@@ -1,60 +1,13 @@
 #include "renderer.hpp"
 
 #include "app/scene.hpp"
-#include "emitter/emitter.hpp"
-#include "utils/opengl.hpp"
-#include "utils/shader_cache.hpp"
 
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
-#include <spdlog/spdlog.h>
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
 
 namespace
 {
-
-constexpr std::size_t BufferCount {3};
-
-GLuint      splatProgram;   // compute: particle positions -> density image
-GLuint      resolveProgram; // fullscreen: density image -> color
-GLuint      fullscreenVAO;  // empty VAO, fullscreen triangle uses gl_VertexID
-GLuint      densityTexture;
-GLuint      particleSSBO[BufferCount];
-void*       mappedPtr[BufferCount];
-GLsync      fences[BufferCount] = {};
-std::size_t currentBuffer       = 0;
-
-constexpr GLbitfield kStorageFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-
-void* createMappedStorage(GLuint buffer, GLsizeiptr bytes)
-{
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER, bytes, nullptr, kStorageFlags);
-
-    void* ptr = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, bytes, kStorageFlags);
-    if (ptr == nullptr) {
-        throw std::runtime_error("Failed to map particle buffer");
-    }
-
-    return ptr;
-}
-
-GLuint createUintTexture(int w, int h)
-{
-    GLuint texture = 0;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32UI, w, h);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    return texture;
-}
 
 constexpr glm::vec3 kOrbitTarget {0.0F, 0.0F, 0.0F};
 constexpr glm::vec3 kWorldUp {0.0F, 1.0F, 0.0F};
@@ -119,81 +72,15 @@ glm::mat4 Camera::viewProj(float aspect) const noexcept
     return proj * view();
 }
 
-Renderer::~Renderer()
+RenderView Camera::renderView(float aspect) const noexcept
 {
-    for (std::size_t i = 0; i < BufferCount; ++i) {
-        if (fences[i]) {
-            glDeleteSync(fences[i]);
-        }
+    glm::mat4 v = view();
 
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, particleSSBO[i]);
-        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-    }
-
-    glDeleteBuffers(BufferCount, particleSSBO);
-    glDeleteTextures(1, &densityTexture);
-    glDeleteVertexArrays(1, &fullscreenVAO);
-}
-
-Renderer::Renderer()
-{
-    splatProgram   = ShaderCache::getProgram("SplatProgram");
-    resolveProgram = ShaderCache::getProgram("ResolveProgram");
-
-    particleCountLoc_ = glGetUniformLocation(splatProgram, "particleCount");
-    screenSizeLoc_    = glGetUniformLocation(splatProgram, "screenSize");
-    viewProjLoc_      = glGetUniformLocation(splatProgram, "viewProj");
-
-    depthFalloffLoc_   = glGetUniformLocation(splatProgram, "depthFalloff");
-    depthReferenceLoc_ = glGetUniformLocation(splatProgram, "depthReference");
-    viewRowZLoc_       = glGetUniformLocation(splatProgram, "viewRowZ");
-    particleRadiusLoc_ = glGetUniformLocation(splatProgram, "particleRadius");
-
-    colorLoc_          = glGetUniformLocation(resolveProgram, "particleColor");
-    densitySamplerLoc_ = glGetUniformLocation(resolveProgram, "densityImage");
-    fadeLoc_           = glGetUniformLocation(resolveProgram, "fadeScale");
-
-    std::array<GLint, 3> maxGroups {};
-    for (GLuint dim = 0; dim < maxGroups.size(); ++dim) {
-        glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, dim, &maxGroups[dim]);
-    }
-
-    maxWorkGroups_ = static_cast<GLuint>(maxGroups[0]);
-    spdlog::info(
-        "max compute work groups: {} x {} x {} ({} particles per dispatch axis)",
-        maxGroups[0],
-        maxGroups[1],
-        maxGroups[2],
-        static_cast<std::uint64_t>(maxWorkGroups_) * 256U);
-
-    // Fullscreen triangle needs no vertex data at all — gl_VertexID drives it.
-    glGenVertexArrays(1, &fullscreenVAO);
-
-    // --- Particle storage buffers, persistent-mapped, used as SSBOs now ---
-    glGenBuffers(BufferCount, particleSSBO);
-
-    for (std::size_t i = 0; i < BufferCount; ++i) {
-        mappedPtr[i] = createMappedStorage(particleSSBO[i], MAX_PARTICLES * sizeof(ParticleVector));
-    }
-
-    texW_ = 0; // force creation on first frame
-    texH_ = 0;
-}
-
-void Renderer::resizeDensityTexture(int w, int h)
-{
-    if ((w == texW_) && (h == texH_)) {
-        return;
-    }
-
-    texW_ = w;
-    texH_ = h;
-
-    if (densityTexture != 0) {
-        glDeleteTextures(1, &densityTexture);
-    }
-
-    densityTexture = createUintTexture(w, h);
+    return {
+        .viewProj       = viewProj(aspect),
+        .viewRowZ       = {v[0][2], v[1][2], v[2][2], v[3][2]},
+        .depthReference = depthReference(),
+    };
 }
 
 void Renderer::renderSettings(float dt)
@@ -201,19 +88,17 @@ void Renderer::renderSettings(float dt)
     ImGui::Begin("Renderer");
     ImGui::Text("FPS: %f", 1.0F / dt);
     ImGui::Text("DT: %f", dt);
-    ImGui::SliderFloat("Density fade", &fadeScale_, 0.01F, 1.0F);
-    ImGui::ColorEdit4("Particle color", glm::value_ptr(particleColor_));
 
-    ImGui::SliderInt("Particle size", &particleRadius_, 0, 8, "%d px radius");
-    ImGui::SetItemTooltip(
-        "0 = one pixel per particle.\n"
-        "Cost is quadratic: every pixel of the disc is an atomic add,\n"
-        "so radius 4 is ~50x the splat work of radius 0.");
+    ImGui::SeparatorText("Mode");
 
-    ImGui::SliderFloat("Depth falloff", &depthFalloff_, 0.0F, 3.0F);
-    ImGui::SetItemTooltip(
-        "0 = flat, 1 = 1/depth, 2 = inverse-square.\n"
-        "Near-flat in 2D: a parallel projection has no distance attenuation.");
+    int mode = static_cast<int>(mode_);
+    ImGui::RadioButton("Points", &mode, static_cast<int>(RenderMode::Points));
+    ImGui::SetItemTooltip("One GL_POINTS draw. Simple, and what to use while working on the simulation.");
+    ImGui::SameLine();
+    ImGui::RadioButton("Splat", &mode, static_cast<int>(RenderMode::Splat));
+    ImGui::SetItemTooltip("Compute-accumulated density. Survives counts the point rasterizer will not.");
+    mode_ = static_cast<RenderMode>(mode);
+
     ImGui::End();
 
     ImGui::Begin("Camera");
@@ -319,83 +204,33 @@ void Renderer::render(GLFWwindow* window, Scene& scene, float dt)
 {
     renderSettings(dt);
 
+    // Only the active pipeline's settings, so the inactive one's knobs are not sitting
+    // there looking like they do something.
+    if (mode_ == RenderMode::Points) {
+        points_.renderSettings();
+    }
+    else {
+        splat_.renderSettings();
+    }
+
     int w = 0;
     int h = 0;
     glfwGetFramebufferSize(window, &w, &h);
-    float     aspect   = (h > 0)? (float)w / (float)h : 1.0F;
-    glm::mat4 viewProj = camera_.viewProj(aspect);
+    float aspect = (h > 0)? (float)w / (float)h : 1.0F;
 
-    spawnFromMouse(scene, viewProj, w, h, dt);
+    RenderView view = camera_.renderView(aspect);
 
-    resizeDensityTexture(w, h);
+    spawnFromMouse(scene, view.viewProj, w, h, dt);
 
-    currentBuffer = (currentBuffer + 1) % BufferCount;
-    if (fences[currentBuffer]) {
-        GLenum result = glClientWaitSync(fences[currentBuffer], GL_SYNC_FLUSH_COMMANDS_BIT, 1'000'000'000);
-        if ((result == GL_TIMEOUT_EXPIRED) || (result == GL_WAIT_FAILED)) {
-            spdlog::warn("particle buffer fence wait failed/timed out");
-        }
+    // One upload, whichever pipeline consumes it, then one fence covering its draw.
+    particles_.upload(scene.positions());
 
-        glDeleteSync(fences[currentBuffer]);
-        fences[currentBuffer] = nullptr;
+    if (mode_ == RenderMode::Points) {
+        points_.draw(particles_, view);
+    }
+    else {
+        splat_.draw(particles_, view, w, h);
     }
 
-    auto positions = scene.positions();
-    std::memcpy(mappedPtr[currentBuffer], positions.data(), positions.size() * sizeof(ParticleVector));
-
-    GLuint count = static_cast<GLuint>(positions.size());
-
-    // --- Clear the accumulation texture ---
-    static const GLuint zero = 0;
-    glClearTexImage(densityTexture, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
-
-    // --- Splat pass: compute shader, one thread per particle ---
-    glUseProgram(splatProgram);
-    glUniform1ui(particleCountLoc_, count);
-    glUniform2i(screenSizeLoc_, w, h);
-    glUniformMatrix4fv(viewProjLoc_, 1, GL_FALSE, glm::value_ptr(viewProj));
-
-    // Anchoring the reference depth to the camera's standoff keeps the centre of the
-    // cloud at full brightness no matter how far the camera pulls back.
-    glm::mat4 view = camera_.view();
-
-    glUniform1f(depthFalloffLoc_, depthFalloff_);
-    glUniform1f(depthReferenceLoc_, camera_.depthReference());
-    glUniform4f(viewRowZLoc_, view[0][2], view[1][2], view[2][2], view[3][2]);
-    glUniform1i(particleRadiusLoc_, particleRadius_);
-
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, particleSSBO[currentBuffer]);
-    glBindImageTexture(1, densityTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
-
-    constexpr GLuint kLocalSize = 256;
-    GLuint           groups     = (count + kLocalSize - 1) / kLocalSize;
-    if (groups > 0) {
-        // A dispatch is capped per dimension — 65535 on any D3D12-backed driver, which
-        // is only ~16.7M particles down a single axis. Past the cap the driver rejects
-        // the whole dispatch with GL_INVALID_VALUE and splats nothing, so the screen
-        // goes black instead of degrading. Folding the excess into Y buys 65535x room;
-        // the shader linearizes the grid back into a particle index.
-        GLuint groupsX = std::min(groups, maxWorkGroups_);
-        GLuint groupsY = (groups + groupsX - 1) / groupsX;
-        glDispatchCompute(groupsX, groupsY, 1);
-    }
-
-    // Make sure the atomic writes are visible before the resolve pass reads them, and
-    // before next frame's glClearTexImage overwrites them — image stores are incoherent
-    // in both directions.
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT | GL_TEXTURE_UPDATE_BARRIER_BIT);
-
-    // --- Resolve pass: one fullscreen triangle, density -> color ---
-    glUseProgram(resolveProgram);
-    glUniform4fv(colorLoc_, 1, glm::value_ptr(particleColor_));
-    glUniform1f(fadeLoc_, fadeScale_);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, densityTexture);
-    glUniform1i(densitySamplerLoc_, 0);
-
-    glBindVertexArray(fullscreenVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-
-    fences[currentBuffer] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+    particles_.fence();
 }
