@@ -4,84 +4,23 @@
 
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
+#include <algorithm>
+#include <numbers>
+#include <vector>
 
 namespace
 {
 
-constexpr glm::vec3 kOrbitTarget {0.0F, 0.0F, 0.0F};
-constexpr glm::vec3 kWorldUp {0.0F, 1.0F, 0.0F};
+constexpr float kMoveSpeed = 3.0F; // world units per second
+constexpr float kTurnSpeed = 1.5F; // radians per second
 
-// An orthographic eye position is arbitrary — zoom comes from the box size, not the
-// standoff. Parking it well back keeps every particle in front of the camera plane
-// so the depth term stays positive, and the far plane covers a long-lived cloud.
-constexpr float kOrthoStandoff = 50.0F;
-constexpr float kOrthoFar      = 500.0F;
+constexpr float kLookSensitivity = 0.0035F;                    // radians per pixel of mouse travel
+constexpr float kPitchLimit      = 1.55334F;                   // 89 degrees, just shy of vertical
+constexpr float kTwoPi           = 2.0F * std::numbers::pi_v<float>;
 
 } // namespace
-
-glm::vec3 Camera::forward() const noexcept
-{
-    return {std::cos(pitch) * std::sin(yaw), std::sin(pitch), std::cos(pitch) * std::cos(yaw)};
-}
-
-glm::vec3 Camera::right() const noexcept
-{
-    // Safe while pitch stays inside +-89 degrees, which both the slider and the Top
-    // button respect; at a true pole this cross product collapses to zero.
-    return glm::normalize(glm::cross(forward(), kWorldUp));
-}
-
-glm::vec3 Camera::up() const noexcept
-{
-    return glm::cross(right(), forward());
-}
-
-glm::vec3 Camera::eye() const noexcept
-{
-    float standoff = (projection == Projection::Orthographic)? kOrthoStandoff : distance;
-    return kOrbitTarget - (forward() * standoff);
-}
-
-glm::mat4 Camera::view() const noexcept
-{
-    return glm::lookAt(eye(), kOrbitTarget, kWorldUp);
-}
-
-float Camera::depthReference() const noexcept
-{
-    // Derived from eye() rather than repeating its projection test, so the two cannot
-    // drift apart: this is just the depth of the orbit target itself.
-    return glm::length(kOrbitTarget - eye());
-}
-
-glm::mat4 Camera::viewProj(float aspect) const noexcept
-{
-    if (projection == Projection::Orthographic) {
-        // Size the box to the vertical extent the perspective view would show at the
-        // target plane, so flipping between 2D and 3D doesn't jump the cloud's
-        // on-screen scale and the same Distance/FOV sliders keep working in both.
-        float halfHeight = distance * std::tan(glm::radians(fovDegrees) * 0.5F);
-        float halfWidth  = halfHeight * aspect;
-
-        glm::mat4 proj = glm::ortho(-halfWidth, halfWidth, -halfHeight, halfHeight, 0.01F, kOrthoFar);
-        return proj * view();
-    }
-
-    glm::mat4 proj = glm::perspective(glm::radians(fovDegrees), aspect, 0.01F, 1000.0F);
-    return proj * view();
-}
-
-RenderView Camera::renderView(float aspect) const noexcept
-{
-    glm::mat4 v = view();
-
-    return {
-        .viewProj       = viewProj(aspect),
-        .viewRowZ       = {v[0][2], v[1][2], v[2][2], v[3][2]},
-        .depthReference = depthReference(),
-    };
-}
 
 void Renderer::renderSettings(float dt)
 {
@@ -124,37 +63,104 @@ void Renderer::renderSettings(float dt)
         "Existing particles keep the motion they were born with.");
 
     // Axis-aligned views, which is what makes the 2D mode read as a flat plan/elevation
-    // rather than just an unforeshortened 3D shot. Top stops at the same 89 degrees the
-    // pitch slider does, because a camera looking straight down the world up axis makes
-    // lookAt degenerate.
+    // rather than just an unforeshortened 3D shot. Each one also flies the camera back to
+    // where the origin is in frame, since a free camera could be anywhere by then. Top
+    // stops at 89 degrees, the same place the pitch slider does, because a camera looking
+    // straight down the world up axis makes lookAt degenerate.
+    auto snapView = [this] (float degreesYaw, float degreesPitch) {
+            camera_.yaw      = glm::radians(degreesYaw);
+            camera_.pitch    = glm::radians(degreesPitch);
+            camera_.position = -camera_.forward() * camera_.focusDistance;
+        };
+
     if (ImGui::Button("Top")) {
-        camera_.yaw   = 0.0F;
-        camera_.pitch = glm::radians(89.0F);
+        snapView(0.0F, -89.0F);
     }
 
     ImGui::SameLine();
     if (ImGui::Button("Front")) {
-        camera_.yaw   = 0.0F;
-        camera_.pitch = 0.0F;
+        snapView(0.0F, 0.0F);
     }
 
     ImGui::SameLine();
     if (ImGui::Button("Side")) {
-        camera_.yaw   = glm::radians(90.0F);
-        camera_.pitch = 0.0F;
+        snapView(90.0F, 0.0F);
     }
 
     ImGui::SliderAngle("Yaw", &camera_.yaw, -180.0F, 180.0F);
     ImGui::SliderAngle("Pitch", &camera_.pitch, -89.0F, 89.0F);
-    ImGui::SliderFloat("Distance", &camera_.distance, 0.1F, 20.0F);
-    ImGui::SetItemTooltip("In 2D this scales the view box rather than moving the eye");
+    ImGui::DragFloat3("Position", glm::value_ptr(camera_.position), 0.05F);
+    ImGui::SliderFloat("Focus distance", &camera_.focusDistance, 0.1F, 20.0F);
+    ImGui::SetItemTooltip(
+        "How far ahead the plane of interest sits: sets the 2D zoom, the distance a\n"
+        "particle draws at nominal size, and the depth a click spawns at");
     ImGui::SliderFloat("FOV", &camera_.fovDegrees, 10.0F, 120.0F, "%.0f deg");
-    ImGui::Checkbox("Auto orbit", &autoOrbit_);
+    ImGui::Checkbox("Auto turn", &autoTurn_);
+    ImGui::SetItemTooltip("Sweeps the view around where the camera stands");
+    ImGui::TextDisabled("WASD flies, right-drag or Q/E looks, Shift for speed");
     ImGui::End();
 
-    if (autoOrbit_) {
-        camera_.yaw = std::fmod(camera_.yaw + (dt * 0.4F), 6.28318530718F);
+    if (autoTurn_) {
+        camera_.yaw += dt * 0.4F;
     }
+
+    ImGuiIO& io = ImGui::GetIO();
+
+    // ImGui already tracks input state for its own widgets, so polling it here buys camera
+    // control without a GLFW callback of its own. Movement is along the camera's own axes,
+    // which is what makes it fly rather than slide along the world grid.
+    if (!io.WantCaptureKeyboard) {
+        float sprint = ImGui::IsKeyDown(ImGuiMod_Shift)? 4.0F : 1.0F;
+        float move   = kMoveSpeed * sprint * dt;
+        float turn   = kTurnSpeed * dt;
+
+        glm::vec3 forward = camera_.forward();
+        glm::vec3 right   = camera_.right();
+
+        if (ImGui::IsKeyDown(ImGuiKey_W)) {
+            camera_.position += forward * move;
+        }
+
+        if (ImGui::IsKeyDown(ImGuiKey_S)) {
+            camera_.position -= forward * move;
+        }
+
+        if (ImGui::IsKeyDown(ImGuiKey_D)) {
+            camera_.position += right * move;
+        }
+
+        if (ImGui::IsKeyDown(ImGuiKey_A)) {
+            camera_.position -= right * move;
+        }
+
+        // Yaw grows counter-clockwise seen from above, so turning right subtracts.
+        if (ImGui::IsKeyDown(ImGuiKey_Q)) {
+            camera_.yaw += turn;
+        }
+
+        if (ImGui::IsKeyDown(ImGuiKey_E)) {
+            camera_.yaw -= turn;
+        }
+    }
+
+    // Mouse look on a held right button. Latched on the press, so a drag that wanders over
+    // a panel keeps steering instead of stopping dead — only where it starts matters.
+    if (mouseLooking_ || (!io.WantCaptureMouse && ImGui::IsMouseClicked(ImGuiMouseButton_Right))) {
+        mouseLooking_ = ImGui::IsMouseDown(ImGuiMouseButton_Right);
+
+        // Not scaled by dt: a mouse reports how far it moved, not how fast, so scaling it
+        // by frame time would make the same flick turn further on a slow frame.
+        camera_.yaw   -= io.MouseDelta.x * kLookSensitivity;
+        camera_.pitch -= io.MouseDelta.y * kLookSensitivity;
+
+        // Stops short of vertical for the same reason the pitch slider does: straight down
+        // the world up axis makes lookAt degenerate.
+        camera_.pitch = std::clamp(camera_.pitch, -kPitchLimit, kPitchLimit);
+    }
+
+    // Wrap once, after every source has had its say, so the slider stays in range however
+    // far the camera has been spun. remainder lands in [-pi, pi]; fmod would not.
+    camera_.yaw = std::remainder(camera_.yaw, kTwoPi);
 }
 
 void Renderer::spawnFromMouse(Scene& scene, glm::mat4 const& viewProj, int w, int h, float dt)
@@ -172,8 +178,8 @@ void Renderer::spawnFromMouse(Scene& scene, glm::mat4 const& viewProj, int w, in
     float ndc_x = ((2.0F * local_x) / (float)w) - 1.0F;
     float ndc_y = 1.0F - ((2.0F * local_y) / (float)h);
 
-    // Cast a ray through the cursor and land it on the plane that passes through
-    // the orbit target facing the camera, so clicks always spawn in view.
+    // Cast a ray through the cursor and land it on the plane that passes through the
+    // focus point facing the camera, so clicks always spawn in view.
     glm::mat4 invViewProj = glm::inverse(viewProj);
     glm::vec4 nearPoint   = invViewProj * glm::vec4(ndc_x, ndc_y, -1.0F, 1.0F);
     glm::vec4 farPoint    = invViewProj * glm::vec4(ndc_x, ndc_y, 1.0F, 1.0F);
@@ -189,14 +195,9 @@ void Renderer::spawnFromMouse(Scene& scene, glm::mat4 const& viewProj, int w, in
         return;
     }
 
-    float t = glm::dot(kOrbitTarget - origin, forward) / denom;
+    float t = glm::dot(camera_.focusPoint() - origin, forward) / denom;
     if (t > 0.0F) {
-        scene.spawn(
-            {.origin = origin + (ray * t),
-             .right  = camera_.right(),
-             .up     = camera_.up(),
-             .planar = planarEmission_},
-            dt);
+        scene.spawn(dt);
     }
 }
 
@@ -213,6 +214,8 @@ void Renderer::render(GLFWwindow* window, Scene& scene, float dt)
         splat_.renderSettings();
     }
 
+    spheres_.renderSettings();
+
     int w = 0;
     int h = 0;
     glfwGetFramebufferSize(window, &w, &h);
@@ -220,7 +223,12 @@ void Renderer::render(GLFWwindow* window, Scene& scene, float dt)
 
     RenderView view = camera_.renderView(aspect);
 
-    spawnFromMouse(scene, view.viewProj, w, h, dt);
+    // Bodies first: they are the only opaque thing here, so they lay down the depth the
+    // particles are then blended over.
+    std::vector<SceneObject const*> objects = scene.getSceneObjects();
+    spheres_.draw(objects, view);
+
+    scene.spawn(dt);
 
     // One upload, whichever pipeline consumes it, then one fence covering its draw.
     particles_.upload(scene.positions());

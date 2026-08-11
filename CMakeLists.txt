@@ -39,11 +39,13 @@ add_executable(${PROJECT}
     src/renderer/particle_buffer.cpp
     src/renderer/point_pipeline.cpp
     src/renderer/splat_pipeline.cpp
+    src/renderer/sphere_pipeline.cpp
 
     src/utils/logger.cpp
     src/utils/shader_cache.cpp
     src/utils/rng.cpp
     src/app/scene.cpp
+    src/logic/camera.cpp
 )
 
 set_property(TARGET ${PROJECT} PROPERTY CXX_STANDARD 26)

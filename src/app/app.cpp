@@ -107,6 +107,24 @@ App::App(std::string const& title)
     );
 
     ShaderCache::compileProgram(
+        "SphereProgram",
+        {
+            ShaderCache::load(
+                "sphere_vertex",
+                {
+                    .source = resource_string / "shaders/sphere.vert",
+                    .type   = GL_VERTEX_SHADER
+                }),
+            ShaderCache::load(
+                "sphere_fragment",
+                {
+                    .source = resource_string / "shaders/sphere.frag",
+                    .type   = GL_FRAGMENT_SHADER
+                }),
+        }
+    );
+
+    ShaderCache::compileProgram(
         "SplatProgram",
         {
             ShaderCache::load(
@@ -157,7 +175,9 @@ void App::run(int fps)
 
     while (!glfwWindowShouldClose(window)) {
         glClearColor(0.0, 0.0, 0.0, 1.0);
-        glClear(GL_COLOR_BUFFER_BIT);
+        // Depth too: the sphere pass is the one thing that depth tests, and a depth
+        // buffer left over from the previous frame would occlude this frame's bodies.
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Floored, so a frame the clock reports as instantaneous cannot divide by zero
         // in the FPS readout or stall the spawn accumulator.

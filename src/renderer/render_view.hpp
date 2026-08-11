@@ -2,6 +2,7 @@
 #define YARR_RENDER_VIEW_HPP
 
 #include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/ext/vector_float4.hpp>
 
 // Everything a draw pipeline needs from whatever is looking at the scene. Pipelines stay
@@ -18,6 +19,11 @@ struct RenderView
     glm::vec4 viewRowZ {0.0F, 0.0F, -1.0F, 0.0F};
 
     float depthReference {1.0F}; // depth at which a particle draws at its nominal size
+
+    // World-space camera basis, unit length. Screen-facing geometry is built from it, so
+    // a pipeline can face the camera without ever being handed the camera.
+    glm::vec3 right {1.0F, 0.0F, 0.0F};
+    glm::vec3 up {0.0F, 1.0F, 0.0F};
 };
 
 #endif // YARR_RENDER_VIEW_HPP

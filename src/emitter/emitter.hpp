@@ -1,6 +1,7 @@
 #ifndef YARR_EMITTER_HPP
 #define YARR_EMITTER_HPP
 
+#include "logic/scene_object.hpp"
 #include "utils/rng.hpp"
 
 #include <glm/ext/vector_float2.hpp>
@@ -33,43 +34,45 @@ struct SpawnFrame
     bool planar {false};
 };
 
-struct ParticlePool
-{
-    std::array<ParticleVector, MAX_PARTICLES> positions {};
-    std::array<ParticleVector, MAX_PARTICLES> velocities {};
-    std::array<float, MAX_PARTICLES> ages {};
-};
-
-
 class Emitter
 {
 public:
-    void spawn(SpawnFrame const& frame, float dt);
+    void spawn(float dt);
     void update(float dt);
     void renderSettings();
 
+    [[nodiscard]]
+    std::span<const ParticleVector> data() const noexcept { return {pool_.positions.data(), aliveCount_}; }
+    [[nodiscard]] float const*      ages() const noexcept { return pool_.ages.data(); }
 
-    [[nodiscard]] std::span<const ParticleVector> data() const noexcept
-    {
-        return {pool_.positions.data(), aliveCount_};
-    }
-
-    [[nodiscard]] float const* ages() const noexcept { return pool_.ages.data(); }
-
+    [[nodiscard]] bool               isVisible() const noexcept { return emitterSettings_.visible; }
+    [[nodiscard]] SceneObject const& object() const noexcept    { return emitterSettings_.object; }
 
     // std::pair<ImVec2 const*, std::size_t> culled(float cell_size);
 private:
 
     std::size_t aliveCount_ {0};
     // std::array<ImVec2, MAX_PARTICLES> culled_ {};
-    ParticlePool pool_ {};
-
-    struct
+    struct ParticlePool
     {
-        bool enabled    = {true};
-        float maxAge    = {10.0F};
-        float spawnRate = {2000.0F};
-    } settings_;
+        std::array<ParticleVector, MAX_PARTICLES> positions {};
+        std::array<ParticleVector, MAX_PARTICLES> velocities {};
+        std::array<float, MAX_PARTICLES> ages {};
+    } pool_ {};
+
+    struct EmittingSettings
+    {
+        bool enabled             = {true};
+        float maxAge             = {10.0F};
+        float spawnRate          = {2'000.0F};
+        std::size_t maxParticles = {10'000};
+    } emittingSettings_;
+
+    struct EmitterSettings
+    {
+        SceneObject object;
+        bool visible {true};
+    } emitterSettings_;
 
     double spawnAccumulator_ {};
     RNG    rng_;

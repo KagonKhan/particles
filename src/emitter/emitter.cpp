@@ -1,17 +1,19 @@
 #include "emitter.hpp"
 
-#include <glm/gtc/random.hpp>
-#include <algorithm>
 #include <cmath>
+#include <glm/gtc/random.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <imgui.h>
+#include <algorithm>
 #include <unordered_set>
 
-void Emitter::spawn(SpawnFrame const& frame, float dt)
+void Emitter::spawn(float dt)
 {
     if (aliveCount_ >= MAX_PARTICLES) {
         return;
     }
 
-    spawnAccumulator_ += settings_.spawnRate * dt;
+    spawnAccumulator_ += emittingSettings_.spawnRate * dt;
     int toSpawn = std::min((int)MAX_PARTICLES - (int)aliveCount_, static_cast<int>(spawnAccumulator_));
     spawnAccumulator_ -= toSpawn;
 
@@ -21,22 +23,22 @@ void Emitter::spawn(SpawnFrame const& frame, float dt)
         glm::vec3 jitter {};
         glm::vec3 direction {};
 
-        if (frame.planar) {
-            // Both the offset and the direction are built from the plane's own basis, so
-            // neither picks up a component along its normal. Particles then stay exactly
-            // in the plane for life, since integrating a velocity that lies in it cannot
-            // take them out of it.
-            float angle = rng_.angle();
+        // if (frame.planar) {
+        //     // Both the offset and the direction are built from the plane's own basis, so
+        //     // neither picks up a component along its normal. Particles then stay exactly
+        //     // in the plane for life, since integrating a velocity that lies in it cannot
+        //     // take them out of it.
+        //     float angle = rng_.angle();
 
-            jitter    = (frame.right * rng_.range(-kJitter, kJitter)) + (frame.up * rng_.range(-kJitter, kJitter));
-            direction = (frame.right * std::cos(angle)) + (frame.up * std::sin(angle));
-        }
-        else {
-            jitter    = {rng_.range(-kJitter, kJitter), rng_.range(-kJitter, kJitter), rng_.range(-kJitter, kJitter)};
-            direction = glm::sphericalRand(1.0F);
-        }
+        //     jitter    = (frame.right * rng_.range(-kJitter, kJitter)) + (frame.up * rng_.range(-kJitter, kJitter));
+        //     direction = (frame.right * std::cos(angle)) + (frame.up * std::sin(angle));
+        // }
+        // else {
+        jitter    = {rng_.range(-kJitter, kJitter), rng_.range(-kJitter, kJitter), rng_.range(-kJitter, kJitter)};
+        direction = glm::sphericalRand(1.0F);
+        // }
 
-        pool_.positions[aliveCount_]  = frame.origin + jitter;
+        pool_.positions[aliveCount_]  = emitterSettings_.object.position + jitter;
         pool_.velocities[aliveCount_] = direction * glm::linearRand(0.1F, 1.5F);
         pool_.ages[aliveCount_]       = 0;
 
@@ -46,7 +48,7 @@ void Emitter::spawn(SpawnFrame const& frame, float dt)
 
 void Emitter::update(float dt)
 {
-    if (!settings_.enabled) {
+    if (!emittingSettings_.enabled) {
         return;
     }
 
@@ -65,7 +67,7 @@ void Emitter::update(float dt)
 
     while (i < aliveCount_) {
         pool_.ages[i] += dt;
-        if (pool_.ages[i] >= settings_.maxAge) {
+        if (pool_.ages[i] >= emittingSettings_.maxAge) {
             --aliveCount_;
 
             pool_.positions[i]  = pool_.positions[aliveCount_];
@@ -83,13 +85,28 @@ void Emitter::renderSettings()
     ImGui::Begin("Emitter Settings");
 
     ImGui::Text("Active particles: %zu", aliveCount_);
-    ImGui::Checkbox("Update", &settings_.enabled);
-    ImGui::SliderFloat("Spawn rate", &settings_.spawnRate, 0.0F, MAX_PARTICLES, "%.0f /sec");
-    ImGui::SliderFloat("Lifetime", &settings_.maxAge, 0.1F, 100.0F, "%.2f s");
+    ImGui::Checkbox("Update", &emittingSettings_.enabled);
+    ImGui::SliderFloat("Spawn rate", &emittingSettings_.spawnRate, 0.0F, 10'000, "%.0f /sec");
+    ImGui::SliderFloat("Lifetime", &emittingSettings_.maxAge, 0.1F, 100.0F, "%.2f s");
+    static std::size_t minParticles = 100;
+    static std::size_t maxParticles = 100'000;
 
+    ImGui::SliderScalar(
+        "Maximum particles",
+        ImGuiDataType_U64,
+        &emittingSettings_.maxParticles,
+        &minParticles,
+        &maxParticles
+    );
     if (ImGui::Button("Kill")) {
         aliveCount_ = 0;
     }
+
+    ImGui::SeparatorText("Body");
+
+    ImGui::Checkbox("Visible", &emitterSettings_.visible);
+    ImGui::SliderFloat3("Position", glm::value_ptr(emitterSettings_.object.position), -5.0F, 5.0F);
+    ImGui::SliderFloat("Radius", &emitterSettings_.object.radius, 0.0F, 2.0F);
 
     ImGui::End();
 }
