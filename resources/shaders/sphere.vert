@@ -3,7 +3,7 @@
 // No vertex buffer: the quad's four corners come out of gl_VertexID, so a sphere is
 // fully described by the two uniforms below and nothing has to be uploaded per object.
 uniform mat4  viewProj;
-uniform vec3  center; // world space
+uniform vec2  center; // world space, flat in z like everything else in the scene
 uniform float radius;
 
 // World-space camera basis. Building the quad from it is what makes the impostor face
@@ -19,6 +19,8 @@ void main()
     quadCoord = vec2(((gl_VertexID & 1) == 0)? -1.0 : 1.0,
                      ((gl_VertexID & 2) == 0)? -1.0 : 1.0);
 
-    vec3 world  = center + (radius * ((quadCoord.x * camRight) + (quadCoord.y * camUp)));
+    // The body's centre lies in the simulation plane; the quad itself still faces the
+    // camera, so the impostor reads as a ball sitting on the plane rather than a decal.
+    vec3 world  = vec3(center, 0.0) + (radius * ((quadCoord.x * camRight) + (quadCoord.y * camUp)));
     gl_Position = viewProj * vec4(world, 1.0);
 }

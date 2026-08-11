@@ -2,12 +2,12 @@
 
 layout(local_size_x = 256) in;
 
-// Raw floats, not vec3[]: glm::vec3 is packed to 12 bytes on the CPU, but std430
-// gives an array of vec3 a 16-byte stride. A float array is the only declaration
-// whose layout matches the memcpy'd pool exactly.
+// std430 gives an array of vec2 an 8-byte stride, which is exactly how glm::vec2 is
+// packed on the CPU, so this declaration matches the memcpy'd pool as-is. (A vec3 array
+// would not: std430 pads it to a 16-byte stride and the two layouts disagree.)
 layout(std430, binding = 0) readonly buffer Particles
 {
-    float positions[]; // world space, xyz per particle
+    vec2 positions[]; // world space, flat in z
 };
 
 layout(r32ui, binding = 1) uniform uimage2D densityImage;
@@ -39,10 +39,11 @@ void main()
         return; // ragged tail of the last row
     }
 
-    uint base  = idx * 3u;
-    vec3 world = vec3(positions[base], positions[base + 1u], positions[base + 2u]);
+    // The simulation is flat, so every particle sits at z = 0. The camera is not, which
+    // is why the depth term further down still has something to say.
+    vec4 world = vec4(positions[idx], 0.0, 1.0);
 
-    vec4 clip = viewProj * vec4(world, 1.0);
+    vec4 clip = viewProj * world;
     if (clip.w <= 0.0) {
         return; // behind the eye, the perspective divide would mirror it back on screen
     }
@@ -74,7 +75,7 @@ void main()
     // Using forward-axis depth rather than euclidean distance to the eye also keeps
     // brightness even across the screen instead of dimming toward the corners of a
     // wide field of view.
-    float depth = -dot(viewRowZ, vec4(world, 1.0));
+    float depth = -dot(viewRowZ, world);
 
     float weight = pow(depthReference / max(depth, 1e-3), depthFalloff);
     weight       = clamp(weight, 0.0, kMaxWeight);

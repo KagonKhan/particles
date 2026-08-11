@@ -5,6 +5,7 @@
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <cstdint>
+#include <numbers>
 enum class Projection : std::uint8_t
 {
     Perspective,  // 3D
@@ -15,12 +16,20 @@ enum class Projection : std::uint8_t
 // tied to anything in the scene. Movement keys push the position around; nothing orbits.
 struct Camera
 {
-    Projection projection {Projection::Perspective};
+    // Flat by default, to match the simulation: the cloud lives in a plane, so a parallel
+    // projection square on to it is the honest way to look at it. Perspective is still one
+    // click away, and a free camera makes it worth having.
+    Projection projection {Projection::Orthographic};
 
-    glm::vec3 position {0.0F, 0.0F, -4.0F};
+    // On the +z side of the simulation plane, looking back down -z at it. Which side
+    // matters now that the world is flat: seen from -z the plane is mirrored, because
+    // lookAt's screen-right axis is cross(forward, worldUp) and that puts world +x on the
+    // left. From here +x is screen-right and +y is up, which is what the emitter's
+    // position sliders and drag-placement read as.
+    glm::vec3 position {0.0F, 0.0F, 4.0F};
 
-    float yaw {0.0F};   // radians, around the world Y axis
-    float pitch {0.0F}; // radians, above the horizon
+    float yaw {std::numbers::pi_v<float>}; // radians, around the world Y axis; pi faces -z
+    float pitch {0.0F};                    // radians, above the horizon
     float fovDegrees {60.0F};
 
     // How far ahead of the camera the plane of interest sits. Nothing about the view

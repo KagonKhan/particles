@@ -3,8 +3,10 @@
 
 #include "emitter/emitter.hpp"
 
+#include <glm/ext/vector_float2.hpp>
 #include <memory>
 #include <span>
+#include <vector>
 
 // Everything that exists independently of how it is viewed: the particles themselves
 // and how long they have been simulated. The renderer contributes the camera and the GL
@@ -16,6 +18,10 @@ public:
     void renderSettings();
 
     void spawn(float dt) { emitter_->spawn(dt); }
+
+    // Moves the emitter body. The renderer is what turns a cursor into a point in the
+    // plane, so the position arrives here already in world space.
+    void placeEmitter(glm::vec2 position) { emitter_->setPosition(position); }
 
     [[nodiscard]] std::span<const ParticleVector> positions() const noexcept { return emitter_->data(); }
     [[nodiscard]] float const*                    ages() const noexcept      { return emitter_->ages(); }

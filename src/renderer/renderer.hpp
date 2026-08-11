@@ -29,7 +29,7 @@ public:
 
 private:
     void renderSettings(float dt);
-    void spawnFromMouse(Scene& scene, glm::mat4 const& viewProj, int w, int h, float dt);
+    void dragEmitter(Scene& scene, glm::mat4 const& viewProj, int w, int h);
 
     Camera     camera_;
     RenderMode mode_ {RenderMode::Points};
@@ -42,10 +42,6 @@ private:
 
     // Scene bodies. Independent of the particle mode — both particle paths draw over it.
     SpherePipeline spheres_;
-
-    // Emission is confined to the plane facing the camera, so it follows the projection
-    // by default but stays independently overridable.
-    bool planarEmission_ {false};
 
     // Sweeps yaw where the camera stands, which is a free camera's version of the orbit
     // this used to do.

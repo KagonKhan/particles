@@ -59,7 +59,7 @@ void SpherePipeline::draw(std::span<SceneObject const* const> objects, RenderVie
             continue; // a zero-radius body would collapse the quad to a point
         }
 
-        glUniform3fv(centerLoc_, 1, glm::value_ptr(object->position));
+        glUniform2fv(centerLoc_, 1, glm::value_ptr(object->position));
         glUniform1f(radiusLoc_, object->radius);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }

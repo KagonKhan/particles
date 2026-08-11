@@ -50,23 +50,14 @@ void Renderer::renderSettings(float dt)
 
     if (switched) {
         camera_.projection = static_cast<Projection>(projection);
-
-        // Flattening the projection alone still looks 3D, because a volumetric burst
-        // keeps moving toward and away from the camera. Emission follows the mode by
-        // default, but only on the switch, so the override below stays overridable.
-        planarEmission_ = (camera_.projection == Projection::Orthographic);
     }
 
-    ImGui::Checkbox("Planar emission", &planarEmission_);
-    ImGui::SetItemTooltip(
-        "Confine new particles to the plane facing the camera.\n"
-        "Existing particles keep the motion they were born with.");
-
-    // Axis-aligned views, which is what makes the 2D mode read as a flat plan/elevation
-    // rather than just an unforeshortened 3D shot. Each one also flies the camera back to
-    // where the origin is in frame, since a free camera could be anywhere by then. Top
-    // stops at 89 degrees, the same place the pitch slider does, because a camera looking
-    // straight down the world up axis makes lookAt degenerate.
+    // Axis-aligned views. Front is the one that matters: it looks square on at the plane
+    // the simulation runs in, which is the view everything else is a departure from. Each
+    // one also flies the camera back to where the origin is in frame, since a free camera
+    // could be anywhere by then. Top stops at 89 degrees, the same place the pitch slider
+    // does, because a camera looking straight down the world up axis makes lookAt
+    // degenerate.
     auto snapView = [this] (float degreesYaw, float degreesPitch) {
             camera_.yaw      = glm::radians(degreesYaw);
             camera_.pitch    = glm::radians(degreesPitch);
@@ -74,30 +65,42 @@ void Renderer::renderSettings(float dt)
         };
 
     if (ImGui::Button("Top")) {
-        snapView(0.0F, -89.0F);
+        // Same yaw as Front, so pitching back up from here returns to Front rather than to
+        // the mirrored view behind the plane.
+        snapView(180.0F, -89.0F);
     }
+
+    ImGui::SetItemTooltip("Edge-on to the simulation plane, so the cloud collapses to a line");
 
     ImGui::SameLine();
     if (ImGui::Button("Front")) {
-        snapView(0.0F, 0.0F);
+        // 180, not 0: both look square on at the plane, but from -z it is mirrored, so
+        // only this one puts world +x on the right. snapView derives the position from
+        // the facing, so this also lands the camera on the correct side.
+        snapView(180.0F, 0.0F);
     }
+
+    ImGui::SetItemTooltip("Square on to the simulation plane, +x right — the view the simulation is written for");
 
     ImGui::SameLine();
     if (ImGui::Button("Side")) {
         snapView(90.0F, 0.0F);
     }
 
+    ImGui::SetItemTooltip("Edge-on to the simulation plane, so the cloud collapses to a line");
+
     ImGui::SliderAngle("Yaw", &camera_.yaw, -180.0F, 180.0F);
     ImGui::SliderAngle("Pitch", &camera_.pitch, -89.0F, 89.0F);
     ImGui::DragFloat3("Position", glm::value_ptr(camera_.position), 0.05F);
     ImGui::SliderFloat("Focus distance", &camera_.focusDistance, 0.1F, 20.0F);
     ImGui::SetItemTooltip(
-        "How far ahead the plane of interest sits: sets the 2D zoom, the distance a\n"
-        "particle draws at nominal size, and the depth a click spawns at");
+        "How far ahead the plane of interest sits: sets the 2D zoom and the distance a\n"
+        "particle draws at nominal size");
     ImGui::SliderFloat("FOV", &camera_.fovDegrees, 10.0F, 120.0F, "%.0f deg");
     ImGui::Checkbox("Auto turn", &autoTurn_);
     ImGui::SetItemTooltip("Sweeps the view around where the camera stands");
     ImGui::TextDisabled("WASD flies, right-drag or Q/E looks, Shift for speed");
+    ImGui::TextDisabled("Left-drag moves the emitter across the plane");
     ImGui::End();
 
     if (autoTurn_) {
@@ -163,7 +166,7 @@ void Renderer::renderSettings(float dt)
     camera_.yaw = std::remainder(camera_.yaw, kTwoPi);
 }
 
-void Renderer::spawnFromMouse(Scene& scene, glm::mat4 const& viewProj, int w, int h, float dt)
+void Renderer::dragEmitter(Scene& scene, glm::mat4 const& viewProj, int w, int h)
 {
     ImGuiIO& io = ImGui::GetIO();
     if (io.WantCaptureMouse || !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
@@ -178,27 +181,31 @@ void Renderer::spawnFromMouse(Scene& scene, glm::mat4 const& viewProj, int w, in
     float ndc_x = ((2.0F * local_x) / (float)w) - 1.0F;
     float ndc_y = 1.0F - ((2.0F * local_y) / (float)h);
 
-    // Cast a ray through the cursor and land it on the plane that passes through the
-    // focus point facing the camera, so clicks always spawn in view.
+    // Cast a ray through the cursor and land it on the simulation plane. Now that the
+    // world is flat there is a single unambiguous answer to "what is under the cursor",
+    // which is what makes dragging the emitter around by hand possible at all.
     glm::mat4 invViewProj = glm::inverse(viewProj);
     glm::vec4 nearPoint   = invViewProj * glm::vec4(ndc_x, ndc_y, -1.0F, 1.0F);
     glm::vec4 farPoint    = invViewProj * glm::vec4(ndc_x, ndc_y, 1.0F, 1.0F);
     nearPoint /= nearPoint.w;
     farPoint  /= farPoint.w;
 
-    glm::vec3 origin  = glm::vec3(nearPoint);
-    glm::vec3 ray     = glm::normalize(glm::vec3(farPoint - nearPoint));
-    glm::vec3 forward = camera_.forward();
+    glm::vec3 origin = glm::vec3(nearPoint);
+    glm::vec3 ray    = glm::vec3(farPoint) - origin;
 
-    float denom = glm::dot(ray, forward);
-    if (std::abs(denom) <= 1e-6F) {
+    // A camera looking along the plane rather than at it sees no point under the cursor at
+    // all — the ray runs parallel and never crosses z = 0. Snap to Front to get it back.
+    if (std::abs(ray.z) <= 1e-6F) {
         return;
     }
 
-    float t = glm::dot(camera_.focusPoint() - origin, forward) / denom;
-    if (t > 0.0F) {
-        scene.spawn(dt);
+    float t = -origin.z / ray.z;
+    if ((t < 0.0F) || (t > 1.0F)) {
+        return; // the crossing is behind the eye or past the far plane
     }
+
+    glm::vec3 hit = origin + (t * ray);
+    scene.placeEmitter({hit.x, hit.y});
 }
 
 void Renderer::render(GLFWwindow* window, Scene& scene, float dt)
@@ -227,6 +234,10 @@ void Renderer::render(GLFWwindow* window, Scene& scene, float dt)
     // particles are then blended over.
     std::vector<SceneObject const*> objects = scene.getSceneObjects();
     spheres_.draw(objects, view);
+
+    // Before spawning, so a burst dragged across the screen lands under the cursor on the
+    // same frame rather than trailing it by one.
+    dragEmitter(scene, view.viewProj, w, h);
 
     scene.spawn(dt);
 

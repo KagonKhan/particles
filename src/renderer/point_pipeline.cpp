@@ -23,7 +23,7 @@ PointPipeline::PointPipeline()
     glGenVertexArrays(1, &vao_);
     glBindVertexArray(vao_);
     glEnableVertexAttribArray(0);
-    glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0);
+    glVertexAttribFormat(0, 2, GL_FLOAT, GL_FALSE, 0);
     glVertexAttribBinding(0, 0);
     glBindVertexArray(0);
 }
@@ -72,7 +72,7 @@ void PointPipeline::renderSettings()
 
     ImGui::SliderFloat("Point size", &pointSize_, 1.0F, 32.0F, "%.1f px");
     ImGui::Checkbox("Scale with distance", &attenuate_);
-    ImGui::SetItemTooltip("Nominal size applies at the orbit target; nearer points grow, farther ones shrink");
+    ImGui::SetItemTooltip("Nominal size applies at the focus distance; nearer points grow, farther ones shrink");
 
     ImGui::Checkbox("Round", &roundPoints_);
     if (roundPoints_) {
