@@ -11,7 +11,7 @@
 #include <span>
 
 
-static constexpr std::size_t MAX_PARTICLES = 100'000;
+static constexpr std::size_t MAX_PARTICLES = 1'000'000;
 
 
 // The simulation is flat: a particle has a position and a velocity in the plane, and
@@ -27,9 +27,13 @@ public:
     void renderSettings();
 
     [[nodiscard]]
-    std::span<const ParticleVector> data() const noexcept { return {pool_.positions.data(), aliveCount_}; }
-    [[nodiscard]] float const*      ages() const noexcept { return pool_.ages.data(); }
+    std::span<ParticleVector>  data() noexcept       { return {pool_.positions.data(), aliveCount_}; }
+    std::span<ParticleVector>  velocity() noexcept   { return {pool_.velocities.data(), aliveCount_}; }
+    [[nodiscard]] float const* ages() const noexcept { return pool_.ages.data(); }
 
+    // Whether the simulation is advancing. The scene owns the decision to skip a step, so
+    // that everything acting on the pool is paused together rather than each in isolation.
+    [[nodiscard]] bool               isEnabled() const noexcept { return emittingSettings_.enabled; }
     [[nodiscard]] bool               isVisible() const noexcept { return emitterSettings_.visible; }
     [[nodiscard]] SceneObject const& object() const noexcept    { return emitterSettings_.object; }
 
@@ -51,7 +55,7 @@ private:
         bool enabled             = {true};
         float maxAge             = {10.0F};
         float spawnRate          = {2'000.0F};
-        std::size_t maxParticles = {10'000};
+        std::size_t maxParticles = {1'000'000};
     } emittingSettings_;
 
     struct EmitterSettings

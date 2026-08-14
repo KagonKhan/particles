@@ -1,6 +1,6 @@
 #ifndef YARR_APP_APP_HPP
 #define YARR_APP_APP_HPP
-
+ #define GLM_ENABLE_EXPERIMENTAL
 #include "app/console.hpp"
 #include "app/scene.hpp"
 #include "renderer/renderer.hpp"

@@ -2,6 +2,7 @@
 #define YARR_SCENE_HPP
 
 #include "emitter/emitter.hpp"
+#include "logic/objects/attractor.hpp"
 
 #include <glm/ext/vector_float2.hpp>
 #include <memory>
@@ -21,7 +22,7 @@ public:
 
     // Moves the emitter body. The renderer is what turns a cursor into a point in the
     // plane, so the position arrives here already in world space.
-    void placeEmitter(glm::vec2 position) { emitter_->setPosition(position); }
+    void placeEmitter(glm::vec2 position) { attractor_->setPosition(position); }
 
     [[nodiscard]] std::span<const ParticleVector> positions() const noexcept { return emitter_->data(); }
     [[nodiscard]] float const*                    ages() const noexcept      { return emitter_->ages(); }
@@ -29,14 +30,13 @@ public:
 
     [[nodiscard]] std::vector<SceneObject const*> getSceneObjects() const noexcept
     {
-        if (emitter_->isVisible()) { return {&emitter_->object()}; }
-
-        return {};
+        return {&emitter_->object(), &attractor_->object()};
     }
 
 private:
-    std::unique_ptr<Emitter> emitter_ {std::make_unique<Emitter>()};
-    double                   elapsed_ {0.0};
+    std::unique_ptr<Emitter>   emitter_ {std::make_unique<Emitter>()};
+    std::unique_ptr<Attractor> attractor_ {std::make_unique<Attractor>()};
+    double                     elapsed_ {0.0};
 };
 
 #endif // YARR_SCENE_HPP

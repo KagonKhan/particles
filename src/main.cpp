@@ -1,4 +1,5 @@
-﻿#include "app/app.hpp"
+﻿ #define GLM_ENABLE_EXPERIMENTAL
+#include "app/app.hpp"
 
 #include <spdlog/spdlog.h>
 

@@ -46,6 +46,8 @@ add_executable(${PROJECT}
     src/utils/rng.cpp
     src/app/scene.cpp
     src/logic/camera.cpp
+    src/logic/objects/attractor.hpp
+    src/logic/knob.hpp
 )
 
 set_property(TARGET ${PROJECT} PROPERTY CXX_STANDARD 26)
