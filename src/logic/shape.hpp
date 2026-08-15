@@ -137,8 +137,10 @@ inline constexpr std::array<char const*, std::variant_size_v<Shape>> kShapeNames
 
 [[nodiscard]] inline glm::vec2 gradient(Box shape, glm::vec2 point) noexcept
 {
-    glm::vec2 const quadrant = glm::sign(point);
-    glm::vec2 const outside  = glm::abs(point) - shape.halfExtents;
+    // Not glm::sign, which is zero on an axis: an interior point sitting on one, whose
+    // nearest face is the one that axis picks out, would come back with no direction at all.
+    glm::vec2 const quadrant {(point.x < 0.0F)? -1.0F : 1.0F, (point.y < 0.0F)? -1.0F : 1.0F};
+    glm::vec2 const outside = glm::abs(point) - shape.halfExtents;
 
     if (std::max(outside.x, outside.y) > 0.0F) {
         return quadrant * glm::normalize(glm::max(outside, 0.0F));
@@ -189,6 +191,54 @@ inline constexpr std::array<char const*, std::variant_size_v<Shape>> kShapeNames
 [[nodiscard]] inline float filletRadius(Shape const& shape) noexcept
 {
     return std::visit([] (auto concrete) { return filletRadius(concrete); }, shape);
+}
+
+// === CONTACT =========================================================================================================
+// Where a particle may not be, and the way out of it. For a solid that is the field itself,
+// negative inside, with the gradient pointing out.
+//
+// A frame is not a solid. Its field is a shell, so the room and the world beyond the wall
+// are both positive, and resolving against it directly fails twice over: a particle that
+// crosses the wall's mid-line in one step is pushed on through rather than back, and one
+// that clears the wall outright is never in contact again and is gone. So a frame is
+// resolved against the complement of its opening instead — the same surface, since the
+// opening is the wall's inner face, but as a containment test that no step size can outrun.
+
+struct Contact
+{
+    float     distance; // negative while the particle is somewhere it may not be
+    glm::vec2 normal;   // unit, pointing at where it may
+};
+
+[[nodiscard]] inline Contact contact(Circle shape, glm::vec2 point) noexcept
+{
+    return {.distance = signedDistance(shape, point), .normal = gradient(shape, point)};
+}
+
+[[nodiscard]] inline Contact contact(Box shape, glm::vec2 point) noexcept
+{
+    return {.distance = signedDistance(shape, point), .normal = gradient(shape, point)};
+}
+
+[[nodiscard]] inline Contact contact(Segment shape, glm::vec2 point) noexcept
+{
+    return {.distance = signedDistance(shape, point), .normal = gradient(shape, point)};
+}
+
+[[nodiscard]] inline Contact contact(HalfPlane shape, glm::vec2 point) noexcept
+{
+    return {.distance = signedDistance(shape, point), .normal = gradient(shape, point)};
+}
+
+[[nodiscard]] inline Contact contact(Frame shape, glm::vec2 point) noexcept
+{
+    Box const opening {shape.halfExtents};
+    return {.distance = -signedDistance(opening, point), .normal = -gradient(opening, point)};
+}
+
+[[nodiscard]] inline Contact contact(Shape const& shape, glm::vec2 point) noexcept
+{
+    return std::visit([point] (auto concrete) { return contact(concrete, point); }, shape);
 }
 
 #endif // YARR_LOGIC_SHAPE_HPP

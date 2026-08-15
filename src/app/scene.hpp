@@ -3,6 +3,7 @@
 
 #include "emitter/emitter.hpp"
 #include "logic/objects/attractor.hpp"
+#include "logic/objects/boundary.hpp"
 
 #include <glm/ext/vector_float2.hpp>
 #include <memory>
@@ -25,12 +26,13 @@ public:
 
     [[nodiscard]] std::vector<SceneObject const*> getSceneObjects() const noexcept
     {
-        return {&emitter_->object(), &attractor_->object()};
+        return {&emitter_->object(), &attractor_->object(), &boundary_->object()};
     }
 
 private:
     std::unique_ptr<Emitter>   emitter_ {std::make_unique<Emitter>()};
     std::unique_ptr<Attractor> attractor_ {std::make_unique<Attractor>()};
+    std::unique_ptr<Boundary>  boundary_ {std::make_unique<Boundary>()};
     double                     elapsed_ {0.0};
 };
 

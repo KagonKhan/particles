@@ -18,6 +18,15 @@ static constexpr std::size_t MAX_PARTICLES = 1'000'000;
 // nothing here can take it out of that plane. The camera is free to look at the plane
 // from wherever it likes — that is the renderer's business, not the emitter's.
 using ParticleVector = glm::vec2;
+struct ParticlePool
+{
+    std::array<ParticleVector, MAX_PARTICLES> positions {};
+    std::array<ParticleVector, MAX_PARTICLES> velocities {};
+    std::array<float, MAX_PARTICLES> ages {};
+
+    std::size_t aliveCount {};
+};
+
 
 class Emitter
 {
@@ -27,8 +36,8 @@ public:
     void renderSettings();
 
     [[nodiscard]]
-    std::span<ParticleVector>  data() noexcept       { return {pool_.positions.data(), aliveCount_}; }
-    std::span<ParticleVector>  velocity() noexcept   { return {pool_.velocities.data(), aliveCount_}; }
+    std::span<ParticleVector>  data() noexcept       { return {pool_.positions.data(), pool_.aliveCount}; }
+    std::span<ParticleVector>  velocity() noexcept   { return {pool_.velocities.data(), pool_.aliveCount}; }
     [[nodiscard]] float const* ages() const noexcept { return pool_.ages.data(); }
 
     // Whether the simulation is advancing. The scene owns the decision to skip a step, so
@@ -39,16 +48,11 @@ public:
 
     void setPosition(glm::vec2 position) noexcept { object_.transform.position = position; }
 
+    ParticlePool& getPool() noexcept { return pool_; }
+
 private:
 
-    std::size_t aliveCount_ {0};
-
-    struct ParticlePool
-    {
-        std::array<ParticleVector, MAX_PARTICLES> positions {};
-        std::array<ParticleVector, MAX_PARTICLES> velocities {};
-        std::array<float, MAX_PARTICLES> ages {};
-    } pool_ {};
+    ParticlePool pool_ {};
 
     struct EmittingSettings
     {
@@ -59,11 +63,11 @@ private:
     } emittingSettings_;
 
     SceneObject object_ {
-        .transform = {},
-        .shape     = Circle {},
-        .height    = 0.25F,
-        .color     = {0.30F, 0.70F, 0.45F, 1.0F},
-        .visible   = true,
+        . transform = {},
+        .shape      = Circle {},
+        .height     = 0.25F,
+        .color      = {0.30F, 0.70F, 0.45F, 1.0F},
+        .visible    = true,
     };
 
     double spawnAccumulator_ {};

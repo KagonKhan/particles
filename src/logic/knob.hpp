@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -202,6 +203,85 @@ public:
 private:
     bool value_ {};
     bool default_ {};
+};
+
+
+// A choice out of a fixed list of names, rendered as a combo. The options are borrowed —
+// they are meant to be a static table, like kShapeNames, that outlives the knob.
+template <>
+class Knob<char const*> final : public KnobBase
+{
+public:
+    Knob(char const* name, std::span<char const* const> options, int value = 0) noexcept
+        : KnobBase{name},
+          options_{options},
+          value_{clampIndex(value)},
+          default_{value_}
+    {}
+
+    bool render() override
+    {
+        if (options_.empty()) {
+            return false;
+        }
+
+        ImGui::PushID(id());
+
+        bool changed = ImGui::Combo(name(), &value_, options_.data(), static_cast<int>(options_.size()));
+
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            value_  = default_;
+            changed = true;
+        }
+
+        ImGui::PopID();
+
+        return changed;
+    }
+
+    // By name rather than by index, so reordering or extending the list does not silently
+    // repoint an existing preset at a different option.
+    [[nodiscard]] nlohmann::json serialize() const override { return get(); }
+
+    void deserialize(nlohmann::json const& in) override
+    {
+        if (in.is_string()) {
+            set(in.get_ref<nlohmann::json::string_t const&>());
+        }
+    }
+
+    [[nodiscard]] char const* get() const noexcept
+    {
+        return options_.empty()? "" : options_[static_cast<std::size_t>(value_)];
+    }
+
+    [[nodiscard]] int index() const noexcept { return value_; }
+
+    [[nodiscard]] std::span<char const* const> options() const noexcept { return options_; }
+
+    // An unknown name leaves the selection alone, as a value of the wrong type would.
+    void set(std::string_view value) noexcept
+    {
+        for (std::size_t i = 0; i < options_.size(); ++i) {
+            if (value == options_[i]) {
+                value_ = static_cast<int>(i);
+                return;
+            }
+        }
+    }
+
+    void setIndex(int value) noexcept { value_ = clampIndex(value); }
+
+private:
+    [[nodiscard]] int clampIndex(int value) const noexcept
+    {
+        return options_.empty()? 0 : std::clamp(value, 0, static_cast<int>(options_.size()) - 1);
+    }
+
+    std::span<char const* const> options_;
+
+    int value_ {};
+    int default_ {};
 };
 
 

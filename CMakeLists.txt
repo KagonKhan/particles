@@ -48,6 +48,8 @@ add_executable(${PROJECT}
     src/app/scene.cpp
     src/logic/camera.cpp
     src/logic/objects/attractor.hpp
+    src/logic/objects/boundary.hpp
+    src/logic/behavior/behavior.hpp
     src/logic/knob.hpp
     src/logic/shape.hpp
     src/logic/scene_object.hpp
