@@ -22,6 +22,7 @@ add_subdirectory(bindings)
 find_package(stb REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(glm REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 
 
@@ -60,6 +61,7 @@ target_link_libraries(${PROJECT} PUBLIC
     
     stb::stb
     spdlog::spdlog
+    nlohmann_json::nlohmann_json
     none
 )
 

@@ -2,25 +2,16 @@
 #define YARR_LOGIC_KNOB_HPP
 
 
-#include "utils/rng.hpp"
-
 #include <imgui.h>
+#include <nlohmann/json.hpp>
 
 #include <cmath>
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <span>
 #include <type_traits>
-
-
-// Whether a knob takes part in "Randomise". Off for anything that picks a mode rather than
-// shapes a look: rolling the dice on "Update" or on a particle budget does not produce a
-// different scene, it produces a broken one.
-enum class Randomise : bool
-{
-    No,
-    Yes,
-};
+#include <utility>
 
 
 template <typename T>
@@ -35,32 +26,26 @@ constexpr ImGuiDataType kDataType = [] {
             return ImGuiDataType_U64;
         }
         else {
-            static_assert(false, "no ImGuiDataType for this knob type"); // fine in C++26
+            static_assert(false, "no ImGuiDataType for this knob type");
         }
     } ();
 
 
-// A per-instance widget identity. ImGui derives a widget's identity from its label, so two
-// knobs sharing a label — the "Strength" of two attractors — would otherwise be the same
-// widget, and dragging one would move the other. Copies take a fresh id rather than the
-// source's, so duplicating a force copies its tuning without copying its widget identity.
 class WidgetId
 {
 public:
     WidgetId() noexcept
         : value_{++counter_} {}
+    ~WidgetId() = default;
+
 
     WidgetId([[maybe_unused]] WidgetId const& other) noexcept
         : value_{++counter_} {}
     WidgetId([[maybe_unused]] WidgetId&& other) noexcept
         : value_{++counter_} {}
 
-    // Identity is a property of the instance, not of the value assigned into it, so an
-    // assigned-to knob keeps the id it was born with.
     WidgetId& operator =([[maybe_unused]] WidgetId const& other) noexcept { return *this; }
     WidgetId& operator =([[maybe_unused]] WidgetId&& other) noexcept      { return *this; }
-
-    ~WidgetId() = default;
 
     [[nodiscard]] int get() const noexcept { return value_; }
 
@@ -71,56 +56,59 @@ private:
 };
 
 
-// The type-erased face of a knob, so a panel can be drawn, randomised or saved by walking a
-// list without knowing what each entry holds. Everything the simulation reads goes through
-// the non-virtual get() on the derived type instead, which inlines to a load.
 class KnobBase
 {
 public:
-    KnobBase()                            = default;
+    explicit KnobBase(char const* name) noexcept
+        : name_{name} {}
+    virtual ~KnobBase() = default;
+
+    virtual bool render() = 0;
+
+    [[nodiscard]] virtual nlohmann::json serialize() const                     = 0;
+    virtual void                         deserialize(nlohmann::json const& in) = 0;
+
+    [[nodiscard]] char const* name() const noexcept { return name_; }
+    [[nodiscard]] int         id() const noexcept   { return id_.get(); }
+
+protected:
     KnobBase(KnobBase const&)             = default;
     KnobBase(KnobBase&&)                  = default;
     KnobBase& operator =(KnobBase const&) = default;
     KnobBase& operator =(KnobBase&&)      = default;
-    virtual ~KnobBase()                   = default;
 
-    virtual bool                      render()              = 0;
-    virtual void                      randomise(RNG& rng)   = 0;
-    [[nodiscard]] virtual char const* name() const noexcept = 0;
+private:
+    WidgetId    id_;
+    char const* name_;
 };
 
 
+// TODO: possibly KnobSpec for default knob limits
 template <typename T>
 class Knob final : public KnobBase
 {
 public:
-    // Not constexpr: the id counter below is mutable state, so a constant-evaluated knob
-    // could not exist anyway.
     Knob(char const*     name,
         T                value,
         T                low,
         T                high,
         char const*      format,
-        ImGuiSliderFlags flags     = ImGuiSliderFlags_AlwaysClamp,
-        Randomise        randomise = Randomise::Yes) noexcept
-        : name_{name},
+        ImGuiSliderFlags flags = ImGuiSliderFlags_AlwaysClamp) noexcept
+        : KnobBase{name},
           format_{format},
           value_{value},
           default_{value},
           low_{low},
           high_{high},
-          flags_{flags},
-          randomise_{randomise}
+          flags_{flags}
     {}
 
     bool render() override
     {
-        ImGui::PushID(id_.get());
+        ImGui::PushID(id());
 
-        bool changed = ImGui::SliderScalar(name_, kDataType<T>, &value_, &low_, &high_, format_, flags_);
+        bool changed = ImGui::SliderScalar(name(), kDataType<T>, &value_, &low_, &high_, format_, flags_);
 
-        // Right-click to put a knob back where it started. This is what makes a wide
-        // exploratory range safe to drag through — there is always a way back.
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             value_  = default_;
             changed = true;
@@ -131,41 +119,35 @@ public:
         return changed;
     }
 
-    void randomise(RNG& rng) override
-    {
-        if (randomise_ == Randomise::No) {
-            return;
-        }
+    [[nodiscard]] nlohmann::json serialize() const override { return value_; }
 
+    void deserialize(nlohmann::json const& in) override
+    {
         if constexpr (std::is_floating_point_v<T>) {
-            // Logarithmic knobs are drawn in log space, or every roll lands in the top
-            // decade and the button only ever finds one look. Guarded on a positive floor,
-            // since log(0) is not a bound.
-            if (((flags_ & ImGuiSliderFlags_Logarithmic) != 0) && (low_ > T {0})) {
-                value_ = std::exp(rng.range(std::log(low_), std::log(high_)));
-            }
-            else {
-                value_ = rng.range(low_, high_);
+            if (in.is_number()) {
+                set(static_cast<T>(in.get<double>()));
             }
         }
         else {
-            value_ = static_cast<T>(rng.range(static_cast<int>(low_), static_cast<int>(high_)));
+            if (!in.is_number_integer()) {
+                return;
+            }
+
+            auto const value = in.get<std::int64_t>();
+
+            if (std::cmp_less(value, low_)) { set(low_); }
+            else if (std::cmp_greater(value, high_)) { set(high_); }
+            else { set(static_cast<T>(value)); }
         }
     }
 
-    [[nodiscard]] char const* name() const noexcept override { return name_; }
-
-    [[nodiscard]] T   get() const noexcept { return value_; }
-    [[nodiscard]] int id() const noexcept  { return id_.get(); }
+    [[nodiscard]] T get() const noexcept { return value_; }
 
     // Clamped, because the bounds are the knob's promise to everything downstream and a
     // value arriving from a preset file has not been through a slider.
     void set(T value) noexcept { value_ = std::clamp(value, low_, high_); }
 
 private:
-    WidgetId id_;
-
-    char const* name_;
     char const* format_;
 
     T value_ {};
@@ -175,31 +157,24 @@ private:
     T high_ {};
 
     ImGuiSliderFlags flags_;
-    Randomise        randomise_;
 };
 
 
-// A checkbox is a knob in every way that this abstraction cares about: it is named, it has a
-// default, it belongs in a preset, and a panel wants to draw it in the same pass as the
-// sliders. It is only the *widget* that differs, so it shares the base and specialises the
-// parts that would be meaningless — there are no bounds to clamp to, no format to print
-// with, and no log scale to draw in.
 template <>
 class Knob<bool> final : public KnobBase
 {
 public:
-    Knob(char const* name, bool value, Randomise randomise = Randomise::No) noexcept
-        : name_{name},
+    Knob(char const* name, bool value) noexcept
+        : KnobBase{name},
           value_{value},
-          default_{value},
-          randomise_{randomise}
+          default_{value}
     {}
 
     bool render() override
     {
-        ImGui::PushID(id_.get());
+        ImGui::PushID(id());
 
-        bool changed = ImGui::Checkbox(name_, &value_);
+        bool changed = ImGui::Checkbox(name(), &value_);
 
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             value_  = default_;
@@ -211,31 +186,22 @@ public:
         return changed;
     }
 
-    // Defaults to opting out: most flags in this project select a mode. A toggle that is
-    // genuinely part of a look — an inversion, a wrap — can opt back in at the call site.
-    void randomise(RNG& rng) override
+    [[nodiscard]] nlohmann::json serialize() const override { return value_; }
+
+    void deserialize(nlohmann::json const& in) override
     {
-        if (randomise_ == Randomise::Yes) {
-            value_ = rng.chance();
+        if (in.is_boolean()) {
+            set(in.get<bool>());
         }
     }
 
-    [[nodiscard]] char const* name() const noexcept override { return name_; }
-
     [[nodiscard]] bool get() const noexcept { return value_; }
-    [[nodiscard]] int  id() const noexcept  { return id_.get(); }
 
     void set(bool value) noexcept { value_ = value; }
 
 private:
-    WidgetId id_;
-
-    char const* name_;
-
     bool value_ {};
     bool default_ {};
-
-    Randomise randomise_;
 };
 
 
@@ -252,10 +218,28 @@ inline bool renderKnobs(std::span<KnobBase* const> knobs)
     return changed;
 }
 
-inline void randomiseKnobs(std::span<KnobBase* const> knobs, RNG& rng)
+inline nlohmann::json serializeKnobs(std::span<KnobBase* const> knobs)
 {
+    nlohmann::json serialized = nlohmann::json::object();
+
+    for (KnobBase const* knob : knobs) {
+        serialized[knob->name()] = knob->serialize();
+    }
+
+    return serialized;
+}
+
+// Absent keys and values of the wrong type leave the knob at whatever it already holds.
+inline void deserializeKnobs(std::span<KnobBase* const> knobs, nlohmann::json const& serialized)
+{
+    if (!serialized.is_object()) {
+        return;
+    }
+
     for (KnobBase* knob : knobs) {
-        knob->randomise(rng);
+        if (auto const entry = serialized.find(knob->name()); (entry != serialized.end())) {
+            knob->deserialize(*entry);
+        }
     }
 }
 

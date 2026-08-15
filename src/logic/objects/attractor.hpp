@@ -65,7 +65,7 @@ struct Simple
 {
     Knob<float> range {"Range", 1.0F, -500.0F, 500.0F, "%.3f"};
     Knob<float> strength {"Strength", -5.0F, -5.0F, 5.0F, "%.3f"};
-    Knob<int> inversePower {"Inverse Power", 0, -5, 5, "%.d"};
+    Knob<float> inversePower {"Inverse Power", 0.0F, -5.0F, 5.0F, "%.3f"};
 
     std::vector<KnobBase*> knobs()
     {
@@ -97,7 +97,7 @@ public:
             if (distance > 0.0001f) {
                 glm::vec2 direction = offset / distance;
 
-                float strength = settings_.strength.get() / std::powf(distance, (float)settings_.inversePower.get());
+                float strength = settings_.strength.get() / std::powf(distance, -settings_.inversePower.get());
 
                 velocities[i] += direction * strength * dt;
             }
@@ -149,11 +149,6 @@ public:
 
         for (auto& knob : settings_.knobs()) {
             knob->render();
-        }
-
-        if (ImGui::Button("Randomise")) {
-            std::vector<KnobBase*> knobs = settings_.knobs();
-            randomiseKnobs(knobs, rng_);
         }
 
         ImGui::SeparatorText("Body");
