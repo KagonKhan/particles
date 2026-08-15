@@ -41,6 +41,10 @@ private:
     float simulationRate_ {60.0F};
     float simulationAccumulator_ {0.0F};
     int   stepsLastFrame_ {0};
+
+    // Time since the interface was last drawn. Only consulted while a benchmark is
+    // recording, when frames are deliberately rare.
+    float uiAccumulator_ {0.0F};
 };
 
 #endif

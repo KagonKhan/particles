@@ -38,7 +38,7 @@ private:
         bool enabled             = {true};
         float maxAge             = {10.0F};
         float spawnRate          = {2'000.0F};
-        std::size_t maxParticles = {1'000'000};
+        std::size_t maxParticles = {2'000'000};
     } emittingSettings_;
 
     SceneObject object_ {

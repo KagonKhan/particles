@@ -24,6 +24,11 @@ find_package(spdlog REQUIRED)
 find_package(glm REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
+# Quiet rather than required, so a tree configured before this was added still builds. The
+# parallel toggle disables itself and says why when the package is missing, which is better
+# than the silent serial fallback libstdc++ gives you for a <execution> that links no backend.
+find_package(TBB QUIET)
+
 
 
 # === PROJECT ==========================================================================================================
@@ -45,6 +50,8 @@ add_executable(${PROJECT}
     src/utils/logger.cpp
     src/utils/shader_cache.cpp
     src/utils/rng.cpp
+    src/utils/topology.cpp
+    src/utils/bench.cpp
     src/app/scene.cpp
     src/logic/camera.cpp
     src/logic/objects/attractor.hpp
@@ -71,3 +78,10 @@ target_link_libraries(${PROJECT} PUBLIC
 )
 
 target_compile_definitions(${PROJECT} PUBLIC RESOURCE_DIR=${PROJECT_SOURCE_DIR}/resources)
+
+if (TBB_FOUND)
+    target_link_libraries(${PROJECT} PUBLIC TBB::tbb)
+    target_compile_definitions(${PROJECT} PUBLIC PARTICLES_HAVE_TBB)
+else()
+    message(STATUS "TBB not found — the parallel toggle will be disabled. Re-run `conan install`.")
+endif()

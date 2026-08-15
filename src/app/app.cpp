@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <string_view>
 
 
 #include "utils/shader_cache.hpp"
@@ -34,6 +35,11 @@ constexpr float kFrameTimeSmoothing = 0.05F;
 // a ceiling, a frame that runs long asks for more steps, which makes the next frame run
 // longer still.
 constexpr int kMaxStepsPerFrame = 8;
+
+// How often the interface is drawn while a benchmark is recording. Rare enough that the
+// rasterizer is effectively absent from the run, often enough that the progress bar moves and
+// the cancel button answers.
+constexpr float kBenchmarkUiPeriod = 0.1F;
 
 
 void glfw_error_callback(int error, const char* description)
@@ -66,6 +72,18 @@ App::App(std::string const& title)
     glfwMakeContextCurrent(window);
     if (glewInit() != GLEW_OK) {
         exit(EXIT_FAILURE);
+    }
+
+    // Which driver answered, said out loud. A software rasterizer is a working renderer and
+    // announces itself no other way — it cost a day of benchmarking the wrong thing once.
+    auto const* const renderer_name = reinterpret_cast<char const*>(glGetString(GL_RENDERER));
+    spdlog::info(
+        "GL renderer: {} | {}",
+        renderer_name,
+        reinterpret_cast<char const*>(glGetString(GL_VERSION)));
+
+    if (std::string_view {renderer_name}.contains("llvmpipe")) {
+        spdlog::warn("Rendering in software. Expect ~10x the CPU, on threads that compete with the simulation.");
     }
 
     glfwSwapInterval(0);
@@ -186,11 +204,6 @@ void App::run()
     while (!glfwWindowShouldClose(window)) {
         auto start_time = Time::measure();
 
-        glClearColor(0.0, 0.0, 0.0, 1.0);
-        // Depth too: the body pass is the one thing that depth tests, and a depth
-        // buffer left over from the previous frame would occlude this frame's bodies.
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         // Floored, so a frame the clock reports as instantaneous cannot divide by zero
         // in the FPS readout or stall the spawn accumulator.
         auto  now = Time::measure();
@@ -206,6 +219,29 @@ void App::run()
             continue;
         }
 
+        // Ahead of the frame, and outside it: the simulation is the thing being measured, and
+        // one that stepped only when something was drawn would be reporting the renderer.
+        spdlog::debug("Simulation step time: {}ms", Time::execution(&App::stepSimulation, this, dt).count());
+
+        // A recording benchmark draws neither the scene nor, for the most part, the interface.
+        // The rasterizer here is llvmpipe — sixteen software threads competing for the sixteen
+        // the simulation is trying to measure — so a million particles drawn between steps
+        // lands in every number the run produces. See docs/performance.md.
+        uiAccumulator_ += dt;
+
+        if (scene.benchmarking() && (uiAccumulator_ < kBenchmarkUiPeriod)) {
+            // Slept rather than spun, so the one thread left awake is not competing either.
+            ImGui_ImplGlfw_Sleep(1);
+            continue;
+        }
+
+        uiAccumulator_ = 0.0F;
+
+        glClearColor(0.0, 0.0, 0.0, 1.0);
+        // Depth too: the body pass is the one thing that depth tests, and a depth
+        // buffer left over from the previous frame would occlude this frame's bodies.
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         startNewFrame();
 
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -219,13 +255,16 @@ void App::run()
         ImGuiID dockspace_id = ImGui::GetID("RootDockSpace");
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
-        // Simulate first, then draw: whatever the steps did lands in the pool the renderer
-        // uploads below, rather than waiting a frame to appear.
-        spdlog::debug("Simulation step time: {}ms", Time::execution(&App::stepSimulation, this, dt).count());
         spdlog::debug("Scene settings render time: {}ms", Time::execution(&Scene::renderSettings, scene).count());
         renderStats();
 
-        spdlog::debug("Rendering time: {}ms", Time::execution(&Renderer::render, renderer, window, scene, dt).count());
+        // The scene pass is the expensive one — an upload of the whole pool and a million
+        // particles rasterized — and it is the one a run does without entirely.
+        if (!scene.benchmarking()) {
+            spdlog::debug(
+                "Rendering time: {}ms",
+                Time::execution(&Renderer::render, renderer, window, scene, dt).count());
+        }
 
         ImGui::Begin("Console Log");
         console.render();
@@ -277,6 +316,16 @@ void App::renderStats()
     ImGui::SetItemTooltip("How often the simulation steps, independent of the frame rate");
     ImGui::Text("Step: %.3f ms", 1000.0F / simulationRate_);
     ImGui::Text("Steps this frame: %d", stepsLastFrame_);
+
+    // The window will look frozen while this is up, which is the point rather than a fault.
+    if (scene.benchmarking()) {
+        ImGui::SeparatorText("Benchmark");
+        ImGui::TextColored(ImVec4 {1.0F, 0.8F, 0.3F, 1.0F}, "Recording — scene rendering paused");
+        ImGui::SetItemTooltip(
+            "The scene pass is skipped and the interface is drawn ten times a second, so the "
+            "rasterizer is not competing with the simulation for cores. The frame readout above "
+            "does not mean anything until the run ends.");
+    }
 
     ImGui::End();
 }

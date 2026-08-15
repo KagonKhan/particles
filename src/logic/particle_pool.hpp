@@ -9,12 +9,17 @@
 #include <span>
 
 
-static constexpr std::size_t MAX_PARTICLES = 1'000'000;
+static constexpr std::size_t MAX_PARTICLES = 2'000'000;
 
-// How much of the pool is handed to the scene's objects at a time. A chunk's positions and
-// velocities come to 16 KiB, so once it has been read in it stays in L1 for however many
-// objects have something to say about it — which is the point of slicing the pool at all.
-// The pool whole is tens of megabytes and would be evicted between every pair of them.
+// A particle's position and velocity together, and so what a chunk of them costs in cache.
+// Ages are not in a chunk: nothing acting on particles reads them.
+static constexpr std::size_t kChunkBytesPerParticle = 2 * sizeof(glm::vec2);
+
+// How much of the pool is handed to the scene's objects at a time, where nothing better is
+// known. A chunk stays in L1 for however many objects have something to say about it, which
+// is the point of slicing the pool at all — the pool whole is tens of megabytes and would be
+// evicted between every pair of them. Half of a 32 KiB L1d, leaving the other half for
+// everything the objects themselves touch.
 static constexpr std::size_t kChunkParticles = 1024;
 
 
@@ -58,14 +63,14 @@ struct ParticlePool
         return {velocities.data(), aliveCount};
     }
 
-    // The chunk starting at `first`, short at the end of the pool. Walked as
-    // `for (first = 0; first < aliveCount; first += kChunkParticles)`.
-    [[nodiscard]] ParticleChunk chunk(std::size_t first) noexcept
+    // The chunk of at most `stride` particles starting at `first`, short at the end of the
+    // pool. Walked as `for (first = 0; first < aliveCount; first += stride)`.
+    [[nodiscard]] ParticleChunk chunk(std::size_t first, std::size_t stride) noexcept
     {
-        std::size_t const count = std::min(kChunkParticles, aliveCount - first);
+        std::size_t const count = std::min(stride, aliveCount - first);
 
         return {
-            .positions  = alivePositions().subspan(first, count),
+            . positions = alivePositions().subspan(first, count),
             .velocities = aliveVelocities().subspan(first, count),
         };
     }

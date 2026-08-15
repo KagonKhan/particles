@@ -3,6 +3,10 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cstdlib>
+#include <filesystem>
+#include <system_error>
+
 
 /*
     THE TODO LIST:
@@ -64,9 +68,34 @@ emitter.hpp:16 sets MAX_PARTICLES = 100'000'000, and ParticlePool holds three st
 */
 
 
+// Mesa left to itself picks llvmpipe on WSLg — its software rasterizer — even though the
+// hardware path is present and offers a higher GL version than this asks for. The cost is
+// about ten times the CPU, spent on threads that then compete with the simulation for cores.
+//
+// Set here rather than in the build, because it has to be true of the process however it was
+// started: a shell, an IDE, a debugger, a launcher script. Mesa reads it when the driver is
+// loaded, which is inside the first GLFW call, so anywhere before App's constructor will do.
+//
+// Only where the driver it names can exist — /dev/dxg is WSL's GPU, and naming a driver that
+// is not there would break GL on a machine that was working. Never overwrites: `0` as the
+// last argument leaves an explicit setting from the environment alone, so llvmpipe stays one
+// `GALLIUM_DRIVER=llvmpipe` away for when it is wanted.
+void preferHardwareRenderer()
+{
+#ifdef __linux__
+    std::error_code error;
+
+    if (std::filesystem::exists("/dev/dxg", error)) {
+        setenv("GALLIUM_DRIVER", "d3d12", 0);
+    }
+#endif
+}
+
 int main()
 {
     spdlog::set_level(spdlog::level::trace);
+
+    preferHardwareRenderer();
 
     App app {"Template Project"};
     app.run();

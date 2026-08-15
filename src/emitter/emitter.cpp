@@ -64,10 +64,10 @@ void Emitter::renderSettings(ParticlePool& pool)
 
     ImGui::Text("Active particles: %zu", pool.aliveCount);
     ImGui::Checkbox("Update", &emittingSettings_.enabled);
-    ImGui::SliderFloat("Spawn rate", &emittingSettings_.spawnRate, 0.0F, 10'000, "%.0f /sec");
+    ImGui::SliderFloat("Spawn rate", &emittingSettings_.spawnRate, 0.0F, 100'000, "%.0f /sec");
     ImGui::SliderFloat("Lifetime", &emittingSettings_.maxAge, 0.1F, 100.0F, "%.2f s");
     static std::size_t minParticles = 100;
-    static std::size_t maxParticles = 1'000'000;
+    static std::size_t maxParticles = 2'000'000;
 
     ImGui::SliderScalar(
         "Maximum particles",

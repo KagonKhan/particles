@@ -62,9 +62,9 @@ struct Advanced
 
 struct Simple
 {
-    Knob<float> range {"Range", 1.0F, -500.0F, 500.0F, "%.3f"};
-    Knob<float> strength {"Strength", -5.0F, -5.0F, 5.0F, "%.3f"};
-    Knob<float> inversePower {"Inverse Power", 0.0F, -5.0F, 5.0F, "%.3f"};
+    Knob<float> range {"Range", 1.0F, 0.01F, 500.0F, "%.3f"};
+    Knob<float> strength {"Strength", -5.0F, -100.0F, 100.0F, "%.3f"};
+    Knob<float> inversePower {"Inverse Power", 1.0F, -5.0F, 5.0F, "%.3f"};
 
     std::vector<KnobBase*> knobs()
     {
@@ -170,11 +170,11 @@ private:
     {} settings_;
 
     SceneObject object_ {
-        .transform = {},
-        .shape     = Circle {},
-        .height    = 0.25F,
-        .color     = {0.55F, 0.40F, 0.80F, 1.0F},
-        .visible   = true,
+        . transform = {},
+        .shape      = Circle {},
+        .height     = 0.25F,
+        .color      = {0.55F, 0.40F, 0.80F, 1.0F},
+        .visible    = true,
     };
 
     RNG rng_;
