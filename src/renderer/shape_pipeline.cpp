@@ -6,6 +6,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 
+#include <array>
 #include <cstddef>
 #include <variant>
 
@@ -16,41 +17,68 @@ struct Drawn
 {
     ObjectType type;
     glm::vec2  dimensions; // as shape.frag reads them back out
-    float      wall;       // a third dimension for shapes that need one, frame only so far
     glm::vec2  offset;     // local-space shift from the object's origin
     glm::vec2  footprint;  // local half-extents about the shifted origin
 };
 
-[[nodiscard]] Drawn drawnAs(Circle shape) noexcept
+// A shape is drawn as one body or as several, and the footprints are what the march is
+// billed for: the vertex shader rasterizes each one's box and nothing outside it.
+struct Drawing
 {
-    return {ObjectType::Circle, {shape.radius, 0.0F}, 0.0F, {}, glm::vec2 {shape.radius}};
+    std::array<Drawn, 4> parts {};
+    std::size_t          count {0};
+
+    [[nodiscard]] auto begin() const noexcept { return parts.begin(); }
+    [[nodiscard]] auto end() const noexcept   { return parts.begin() + static_cast<std::ptrdiff_t>(count); }
+};
+
+[[nodiscard]] Drawing drawnAs(Circle shape) noexcept
+{
+    return {{Drawn {ObjectType::Circle, {shape.radius, 0.0F}, {}, glm::vec2 {shape.radius}}}, 1};
 }
 
-[[nodiscard]] Drawn drawnAs(Box shape) noexcept
+[[nodiscard]] Drawing drawnAs(Box shape) noexcept
 {
-    return {ObjectType::Box, shape.halfExtents, 0.0F, {}, shape.halfExtents};
+    return {{Drawn {ObjectType::Box, shape.halfExtents, {}, shape.halfExtents}}, 1};
 }
 
-[[nodiscard]] Drawn drawnAs(Segment shape) noexcept
+[[nodiscard]] Drawing drawnAs(Segment shape) noexcept
 {
     float const half = shape.thickness * 0.5F;
-    return {ObjectType::Segment, {shape.halfLength, half}, 0.0F, {}, {shape.halfLength + half, half}};
+    return {{Drawn {ObjectType::Segment, {shape.halfLength, half}, {}, {shape.halfLength + half, half}}}, 1};
 }
 
 // Unbounded in the field the simulation sees, so it is drawn as the finite slab hanging
-// off its own outward face. A bounding sphere has nothing to hold onto otherwise.
-[[nodiscard]] Drawn drawnAs(HalfPlane shape) noexcept
+// off its own outward face. A footprint has nothing to hold onto otherwise.
+[[nodiscard]] Drawing drawnAs(HalfPlane shape) noexcept
 {
     glm::vec2 const half {shape.drawExtent, shape.drawExtent * 0.5F};
-    return {ObjectType::Box, half, 0.0F, {0.0F, -half.y}, half};
+    return {{Drawn {ObjectType::Box, half, {0.0F, -half.y}, half}}, 1};
 }
 
-// Dimensions are the wall's centreline, matching how the distance field is built. The
-// footprint has to reach the outer face or the bounding sphere clips the frame's corners.
-[[nodiscard]] Drawn drawnAs(Frame shape) noexcept
+// Four walls rather than the one shelled box the distance field is: as a single body its
+// footprint is the whole room, so every fragment inside the frame marches the field for
+// thirty-two steps only to find the emptiness it was always going to find. The walls'
+// footprints are the walls, which is the frame's outline and nothing else. Their union is
+// the same solid — the caps run the full width and the sides fill in between them.
+[[nodiscard]] Drawing drawnAs(Frame shape) noexcept
 {
-    float const half = shape.thickness * 0.5F;
-    return {ObjectType::Frame, shape.halfExtents + half, half, {}, shape.halfExtents + shape.thickness};
+    float const     half = shape.thickness * 0.5F;
+    glm::vec2 const side {half, shape.halfExtents.y};
+    glm::vec2 const cap {shape.halfExtents.x + shape.thickness, half};
+
+    float const sideX = shape.halfExtents.x + half;
+    float const capY  = shape.halfExtents.y + half;
+
+    return {
+        {
+            Drawn {ObjectType::Box, side, {-sideX, 0.0F}, side},
+            Drawn {ObjectType::Box, side, {sideX, 0.0F}, side},
+            Drawn {ObjectType::Box, cap, {0.0F, -capY}, cap},
+            Drawn {ObjectType::Box, cap, {0.0F, capY}, cap},
+        },
+        4
+    };
 }
 
 [[nodiscard]] void const* byteOffset(std::size_t offset) noexcept
@@ -110,18 +138,20 @@ void ShapePipeline::draw(std::span<SceneObject const* const> objects, RenderView
             continue; // no thickness, so the march has nothing to hit
         }
 
-        Drawn const     drawn  = std::visit([] (auto concrete) { return drawnAs(concrete); }, object->shape);
-        glm::vec2 const centre = object->transform.position + drawn.offset;
-        float const     bounds = glm::length(glm::vec2 {glm::length(drawn.footprint), object->height});
+        Drawing const drawing = std::visit([] (auto concrete) { return drawnAs(concrete); }, object->shape);
 
-        bodies_.push_back({
-            .origin = {
-                centre.x, centre.y,
-                static_cast<float>(static_cast<std::uint8_t>(drawn.type)), drawn.wall
-            },
-            .params = {drawn.dimensions.x, drawn.dimensions.y, object->height, bounds},
-            .color  = object->color,
-        });
+        for (Drawn const& drawn : drawing) {
+            glm::vec2 const centre = object->transform.position + drawn.offset;
+
+            bodies_.push_back({
+                .placement = {centre.x, centre.y, drawn.footprint.x, drawn.footprint.y},
+                .params    = {
+                    drawn.dimensions.x, drawn.dimensions.y, object->height,
+                    static_cast<float>(static_cast<std::uint8_t>(drawn.type))
+                },
+                .color = object->color,
+            });
+        }
     }
 
     if (bodies_.empty()) {

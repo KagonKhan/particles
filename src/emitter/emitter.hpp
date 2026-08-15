@@ -16,7 +16,11 @@ class Emitter
 {
 public:
     void spawn(ParticlePool& pool, float dt);
-    void update(ParticlePool& pool, float dt);
+
+    // Ages the pool and removes what has expired. Structural, so it belongs to the emitter
+    // that set the lifetime rather than to a scene object acting on particles.
+    void reap(ParticlePool& pool, float dt);
+
     void renderSettings(ParticlePool& pool);
 
     // Whether the simulation is advancing. The scene owns the decision to skip a step, so

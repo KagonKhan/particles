@@ -36,13 +36,13 @@ public:
 
 private:
     // All vec4, so the offsets the vertex array is set up with hold whatever alignment glm
-    // is configured for. The shape type rides in origin.z rather than as an integer of its
+    // is configured for. The shape type rides in params.w rather than as an integer of its
     // own, which would put the tail of the struct at the mercy of that alignment.
     struct GpuBody
     {
-        glm::vec4 origin; //  0 — xy world, z the shape type, w a third dimension if wanted
-        glm::vec4 params; // 16 — xy dimensions, z height, w bounding radius
-        glm::vec4 color;  // 32
+        glm::vec4 placement; //  0 — xy world centre, zw the footprint's half extents
+        glm::vec4 params;    // 16 — xy dimensions, z height, w the shape type
+        glm::vec4 color;     // 32
     };
 
     static_assert(sizeof(GpuBody) == 48);

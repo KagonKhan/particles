@@ -11,6 +11,7 @@
 
 #include <array>
 #include <cstddef>
+#include <variant>
 
 // How far off the surface a resolved particle is left. Landing it exactly on the outline
 // lets rounding put it back inside, and it would spend every frame being pushed out again.
@@ -23,7 +24,11 @@ public:
     Behavior()          = default;
     virtual ~Behavior() = default;
 
-    virtual void update(ParticlePool& pool, SceneObject const& object) const = 0;
+    // A chunk rather than the pool, so the scene can hand the same slice to every object
+    // while it is still in cache. One virtual call per chunk — a thousandth of what calling
+    // through this interface per particle would cost, and it buys back the dynamic
+    // behavior list this is an interface for.
+    virtual void apply(ParticleChunk chunk, SceneObject const& object) const = 0;
     virtual void renderKnobs()                                               = 0;
 
 protected:
@@ -37,20 +42,50 @@ struct Bounce : public Behavior
 {
     // The object arrives per call rather than in the constructor, so one behavior can serve
     // every body in the scene and a shape dragged on its sliders takes effect that frame.
-    void update(ParticlePool& pool, SceneObject const& object) const override
+    //
+    // The variant is opened once for the whole chunk, not once per particle: with the
+    // alternative in hand the field and its gradient inline into the loop below, and the
+    // broad phase there is a couple of compares rather than a call through the variant.
+    void apply(ParticleChunk chunk, SceneObject const& object) const override
+    {
+        std::visit(
+            [this, chunk, &object] (auto concrete) { resolve(concrete, chunk, object.transform.position); },
+            object.shape);
+    }
+
+    void renderKnobs() override
+    {
+        ImGui::SeparatorText("Bouncing");
+        bounceFactor_.render();
+        friction_.render();
+        restThreshold_.render();
+    }
+
+private:
+    template <typename ShapeT>
+    void resolve(ShapeT shape, ParticleChunk chunk, glm::vec2 origin) const
     {
         float const restitution = bounceFactor_.get();
         float const slide       = 1.0F - friction_.get();
         float const rest        = restThreshold_.get();
 
-        for (std::size_t i {}; i < pool.aliveCount; ++i) {
-            glm::vec2&    position = pool.positions[i];
-            glm::vec2&    velocity = pool.velocities[i];
-            Contact const hit      = contact(object.shape, position - object.transform.position);
+        for (std::size_t i {}; i < chunk.size(); ++i) {
+            glm::vec2&      position = chunk.positions[i];
+            glm::vec2 const local    = position - origin;
+
+            // Most of a pool is nowhere near any one body on any one frame, and this is what
+            // those particles cost — no square root, no gradient, no contact built.
+            if (!mayContact(shape, local, kContactSkin)) {
+                continue;
+            }
+
+            Contact const hit = contact(shape, local);
 
             if (hit.distance >= kContactSkin) {
                 continue;
             }
+
+            glm::vec2& velocity = chunk.velocities[i];
 
             position += hit.normal * (kContactSkin - hit.distance);
 
@@ -72,15 +107,6 @@ struct Bounce : public Behavior
         }
     }
 
-    void renderKnobs() override
-    {
-        ImGui::SeparatorText("Bouncing");
-        bounceFactor_.render();
-        friction_.render();
-        restThreshold_.render();
-    }
-
-private:
     Knob<float> bounceFactor_ {"Bounce Factor", 1.0F, 0.0F, 5.0F, "%.3f"};
     Knob<float> friction_ {"Friction", 0.0F, 0.0F, 1.0F, "%.3f"};
 
@@ -96,7 +122,7 @@ private:
 struct Cull : public Behavior
 {
     // TODO: accept shape in constructor?
-    void update([[maybe_unused]] ParticlePool& pool, [[maybe_unused]] SceneObject const& object) const override
+    void apply([[maybe_unused]] ParticleChunk chunk, [[maybe_unused]] SceneObject const& object) const override
     {}
 
     void renderKnobs() override

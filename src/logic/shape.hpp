@@ -241,4 +241,48 @@ struct Contact
     return std::visit([point] (auto concrete) { return contact(concrete, point); }, shape);
 }
 
+// === BROAD PHASE =====================================================================================================
+// Whether a point is close enough to be worth the full contact test: false only when its
+// contact distance is certainly at least `margin`. Conservative in that one direction, so a
+// caller may skip on false and nothing else changes.
+//
+// All of them stop at the box-ish underestimate of the field — no square root, no gradient
+// — which is the whole point: almost every particle in a pool is nowhere near any one body,
+// and this is all such a particle is allowed to cost.
+//
+// No Shape overload on purpose. Reached through the variant this would cost more than the
+// test it saves; it is meant to be called with the alternative already in hand.
+
+[[nodiscard]] inline bool mayContact(Circle shape, glm::vec2 point, float margin) noexcept
+{
+    float const reach = shape.radius + margin;
+    return glm::dot(point, point) < (reach * reach);
+}
+
+[[nodiscard]] inline bool mayContact(Box shape, glm::vec2 point, float margin) noexcept
+{
+    glm::vec2 const outside = glm::abs(point) - shape.halfExtents;
+    return std::max(outside.x, outside.y) < margin;
+}
+
+// The capsule sits inside this box, so the box's distance never overstates the capsule's.
+[[nodiscard]] inline bool mayContact(Segment shape, glm::vec2 point, float margin) noexcept
+{
+    float const half = shape.thickness * 0.5F;
+    return mayContact(Box {{shape.halfLength + half, half}}, point, margin);
+}
+
+[[nodiscard]] inline bool mayContact([[maybe_unused]] HalfPlane shape, glm::vec2 point, float margin) noexcept
+{
+    return point.y < margin;
+}
+
+// Inverted along with the contact itself: a frame is escaped by leaving its opening, so the
+// particles worth testing are the ones the opening does not comfortably contain.
+[[nodiscard]] inline bool mayContact(Frame shape, glm::vec2 point, float margin) noexcept
+{
+    glm::vec2 const outside = glm::abs(point) - shape.halfExtents;
+    return std::max(outside.x, outside.y) > -margin;
+}
+
 #endif // YARR_LOGIC_SHAPE_HPP

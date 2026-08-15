@@ -35,13 +35,12 @@ void Emitter::spawn(ParticlePool& pool, float dt)
     }
 }
 
-void Emitter::update(ParticlePool& pool, float dt)
+// Kept out of the scene's fused pass and given one of its own: it is the pool's shape that
+// changes here, not the particles, and a chunk cannot pull a replacement in from a tail that
+// belongs to some other chunk. It reads the ages, which the fused pass never touches, and
+// writes only where something has actually died.
+void Emitter::reap(ParticlePool& pool, float dt)
 {
-    for (std::size_t i {0}; i < pool.aliveCount; ++i) {
-        pool.positions[i] += pool.velocities[i] * dt;
-    }
-
-
     std::size_t i = 0;
 
     while (i < pool.aliveCount) {

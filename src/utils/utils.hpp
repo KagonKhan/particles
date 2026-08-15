@@ -6,6 +6,9 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <type_traits>
+#include <utility>
 
 namespace
 {
@@ -17,6 +20,21 @@ struct Time
     [[nodiscard]] static auto duration(auto const& t1, auto const& t2) noexcept
     {
         return std::chrono::duration_cast<Duration>(t2 - t1);
+    }
+
+    template <typename Duration = std::chrono::milliseconds, typename Fn, typename... Args>
+    [[nodiscard]] static auto execution(Fn&& fn, Args&&... args)
+    {
+        auto const start = measure();
+
+        if constexpr (std::is_void_v<std::invoke_result_t<Fn, Args...>>) {
+            std::invoke(std::forward<Fn>(fn), std::forward<Args>(args)...);
+            return duration<Duration>(start, measure());
+        }
+        else {
+            auto result = std::invoke(std::forward<Fn>(fn), std::forward<Args>(args)...);
+            return std::pair{std::move(result), duration<Duration>(start, measure())};
+        }
     }
 };
 

@@ -8,20 +8,20 @@
 // changing it — the radius for a circle, the half thickness for a capsule, and nothing at
 // all for a box, whose corners are sharp by definition.
 
-// A half plane is unbounded, so shape_pipeline.cpp sends it over as the box it draws as
-// and there is no case for it here.
+// A half plane is unbounded and a frame is a room, so shape_pipeline.cpp sends the first
+// over as the box it draws as and the second as the four boxes its walls are. Neither has
+// a case here.
 const uint kCircle  = 0u;
 const uint kBox     = 1u;
 const uint kSegment = 2u;
-const uint kFrame   = 4u;
 
 const int kMaxSteps = 32;
 
 in vec3       quadWorld;
 flat in vec2  bodyOrigin;
+flat in vec3  bodyExtents;    // the box the body is confined to, so the march can stop
+flat in vec2  bodyDimensions;
 flat in uint  bodyType;
-flat in float bodyWall;   // half the frame's wall; the other shapes have no use for it
-flat in vec4  bodyParams; // xy dimensions, z height, w bounding radius
 flat in vec4  bodyColor;
 
 uniform mat4  viewProj;
@@ -43,38 +43,34 @@ float boxDistance(vec2 p, vec2 halfExtents)
 float outlineDistance(vec2 p)
 {
     if (bodyType == kBox) {
-        return boxDistance(p, bodyParams.xy);
+        return boxDistance(p, bodyDimensions);
     }
 
     if (bodyType == kSegment) {
-        p.x -= clamp(p.x, -bodyParams.x, bodyParams.x);
-        return length(p) - bodyParams.y;
+        p.x -= clamp(p.x, -bodyDimensions.x, bodyDimensions.x);
+        return length(p) - bodyDimensions.y;
     }
 
-    if (bodyType == kFrame) {
-        return abs(boxDistance(p, bodyParams.xy)) - bodyWall;
-    }
-
-    return length(p) - bodyParams.x;
+    return length(p) - bodyDimensions.x;
 }
 
 float filletRadius()
 {
     if (bodyType == kSegment) {
-        return bodyParams.y;
+        return bodyDimensions.y;
     }
 
     if (bodyType == kCircle) {
-        return bodyParams.x; // the sphere case, when it equals the height
+        return bodyDimensions.x; // the sphere case, when it equals the height
     }
 
-    return 0.0; // box and frame both have corners worth keeping
+    return 0.0; // a box keeps its corners
 }
 
 // Exact, so the march below can take full steps.
 float bodyDistance(vec3 world)
 {
-    float height = bodyParams.z;
+    float height = bodyExtents.z;
     float fillet = min(filletRadius(), height);
 
     vec2 profile = vec2(outlineDistance(world.xy - bodyOrigin) + fillet,
@@ -98,24 +94,35 @@ void main()
     vec3 origin = quadWorld;
     vec3 ray    = orthographic? normalize(cameraForward) : normalize(origin - cameraEye);
 
-    // Where the ray crosses the body's bounding sphere, which is the only stretch of it
-    // worth marching. Solved rather than guessed at: the quad is square to the ray only at
-    // the centre of the screen, so a window centred on it would sit off to one side
-    // everywhere else and shave the far edge off the body.
-    vec3  toCentre = vec3(bodyOrigin, 0.0) - origin;
-    float along    = dot(toCentre, ray);
-    float offAxis  = dot(toCentre, toCentre) - (along * along);
-    float bounds   = bodyParams.w * bodyParams.w;
+    // The stretch of the ray inside the body's box, which is the only stretch of it worth
+    // marching. Solved rather than guessed at: the quad is square to the ray only at the
+    // centre of the screen, so a window centred on the body would sit off to one side
+    // everywhere else and shave the far edge off it.
+    //
+    // A ray parallel to an axis divides by zero there. Nudged off it, the slab comes back
+    // enormous but finite, which the comparisons below handle and a NaN would not.
+    vec3 direction = ray + (step(abs(ray), vec3(0.0)) * 1e-6);
+    vec3 centred   = vec3(bodyOrigin, 0.0) - origin;
 
-    if (offAxis > bounds) {
-        discard; // the ray misses the body's bounds entirely, so it misses the body
+    vec3 lower = (centred - bodyExtents) / direction;
+    vec3 upper = (centred + bodyExtents) / direction;
+
+    vec3 entering = min(lower, upper);
+    vec3 leaving  = max(lower, upper);
+
+    // The quad sits on the plane through the body's centre, so this entry is usually behind
+    // the fragment the ray was cast from and the march starts by walking back to it. Left
+    // to start where it stands, a ray would find itself already inside the solid and report
+    // a hit there — the body drawn as the flat section the quad cuts out of it.
+    float entry = max(max(entering.x, entering.y), entering.z);
+    float limit = min(min(leaving.x, leaving.y), leaving.z);
+
+    if (entry > limit) {
+        discard; // the ray misses the box, so it misses the body
     }
 
-    float halfChord = sqrt(bounds - offAxis);
-    float limit     = along + halfChord;
-
-    float epsilon = max(bodyParams.w * 1e-4, 1e-6);
-    float travel  = along - halfChord;
+    float epsilon = max(max(bodyExtents.x, max(bodyExtents.y, bodyExtents.z)) * 1e-4, 1e-6);
+    float travel  = entry;
     bool  hit     = false;
 
     for (int i = 0; i < kMaxSteps; ++i) {

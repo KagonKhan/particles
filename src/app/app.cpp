@@ -184,6 +184,8 @@ void App::run()
     auto previousFrame = Time::measure();
 
     while (!glfwWindowShouldClose(window)) {
+        auto start_time = Time::measure();
+
         glClearColor(0.0, 0.0, 0.0, 1.0);
         // Depth too: the body pass is the one thing that depth tests, and a depth
         // buffer left over from the previous frame would occlude this frame's bodies.
@@ -195,8 +197,8 @@ void App::run()
         float dt  = std::max(
             1e-6F,
             static_cast<float>(Time::duration<std::chrono::nanoseconds>(previousFrame, now).count()) / 1e9F);
-        previousFrame          = now;
-        smoothedFrameTime_    += (dt - smoothedFrameTime_) * kFrameTimeSmoothing;
+        previousFrame       = now;
+        smoothedFrameTime_ += (dt - smoothedFrameTime_) * kFrameTimeSmoothing;
 
         glfwPollEvents();
         if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0) {
@@ -219,11 +221,11 @@ void App::run()
 
         // Simulate first, then draw: whatever the steps did lands in the pool the renderer
         // uploads below, rather than waiting a frame to appear.
-        stepSimulation(dt);
-        scene.renderSettings();
+        spdlog::debug("Simulation step time: {}ms", Time::execution(&App::stepSimulation, this, dt).count());
+        spdlog::debug("Scene settings render time: {}ms", Time::execution(&Scene::renderSettings, scene).count());
         renderStats();
 
-        renderer->render(window, scene, dt);
+        spdlog::debug("Rendering time: {}ms", Time::execution(&Renderer::render, renderer, window, scene, dt).count());
 
         ImGui::Begin("Console Log");
         console.render();
@@ -231,7 +233,10 @@ void App::run()
 
         ImGui::End();
 
-        finishFrame();
+        spdlog::debug("Frame finish time: {}ms", Time::execution(&App::finishFrame, this).count());
+
+        auto end_time = Time::measure();
+        spdlog::debug("Full loop timing: {}ms", Time::duration(start_time, end_time).count());
     }
 }
 
@@ -246,7 +251,7 @@ void App::stepSimulation(float dt)
 
     stepsLastFrame_ = 0;
     while ((simulationAccumulator_ >= step) && (stepsLastFrame_ < kMaxStepsPerFrame)) {
-        scene.update(step);
+        spdlog::debug("Scene update time: {}ms", Time::execution(&Scene::update, scene, step).count());
         simulationAccumulator_ -= step;
         ++stepsLastFrame_;
     }

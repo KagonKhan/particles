@@ -77,31 +77,33 @@ class Attractor
 public:
     void setPosition(glm::vec2 position) { object_.transform.position = position; }
 
-    void simpleUpdate(ParticlePool& pool, float dt)
+    // A chunk at a time, so the scene can put every object's kernel over one slice of the
+    // pool while it is in cache rather than sweeping the whole pool once per object.
+    void simpleApply(ParticleChunk chunk, float dt) const
     {
-        std::span<ParticleVector> particles  = pool.alivePositions();
-        std::span<ParticleVector> velocities = pool.aliveVelocities();
+        // Read once for the chunk. Out of the loop these are constants the compiler can keep
+        // in registers; inside it, each is a load through `this` that it has to assume any
+        // write to a particle might have invalidated.
+        glm::vec2 const centre  = object_.transform.position;
+        float const     rangeSq = settings_.range.get() * settings_.range.get();
+        float const     scale   = settings_.strength.get();
+        float const     power   = -settings_.inversePower.get();
 
-        for (std::size_t i {}; i < particles.size(); ++i) {
-            auto& particle = particles[i];
+        for (std::size_t i {}; i < chunk.size(); ++i) {
+            glm::vec2 const offset    = centre - chunk.positions[i];
+            float const     distance2 = glm::dot(offset, offset);
 
-            glm::vec2 offset =
-                object_.transform.position - particle;
-
-            float distance2 = glm::dot(offset, offset);
-
-            if (distance2 > settings_.range.get() * settings_.range.get()) {
+            if (distance2 > rangeSq) {
                 continue;
             }
 
-            float distance = glm::sqrt(distance2);
+            float const distance = glm::sqrt(distance2);
 
-            if (distance > 0.0001f) {
-                glm::vec2 direction = offset / distance;
+            if (distance > 0.0001F) {
+                glm::vec2 const direction = offset / distance;
+                float const     strength  = scale / std::powf(distance, power);
 
-                float strength = settings_.strength.get() / std::powf(distance, -settings_.inversePower.get());
-
-                velocities[i] += direction * strength * dt;
+                chunk.velocities[i] += direction * strength * dt;
             }
         }
     }
@@ -140,9 +142,9 @@ public:
     //     }
     // }
 
-    void update(ParticlePool& pool, float dt)
+    void apply(ParticleChunk chunk, float dt) const
     {
-        simpleUpdate(pool, dt);
+        simpleApply(chunk, dt);
     }
 
     void renderSettings()

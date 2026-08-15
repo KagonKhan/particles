@@ -16,7 +16,7 @@
 class Boundary
 {
 public:
-    void update(ParticlePool& pool) { behavior_.update(pool, object_); }
+    void apply(ParticleChunk chunk) const { behavior_.apply(chunk, object_); }
 
     void setPosition(glm::vec2 position) noexcept { object_.transform.position = position; }
 
