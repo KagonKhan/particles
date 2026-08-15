@@ -34,10 +34,10 @@ public:
     // Whether the simulation is advancing. The scene owns the decision to skip a step, so
     // that everything acting on the pool is paused together rather than each in isolation.
     [[nodiscard]] bool               isEnabled() const noexcept { return emittingSettings_.enabled; }
-    [[nodiscard]] bool               isVisible() const noexcept { return emitterSettings_.visible; }
-    [[nodiscard]] SceneObject const& object() const noexcept    { return emitterSettings_.object; }
+    [[nodiscard]] bool               isVisible() const noexcept { return object_.visible; }
+    [[nodiscard]] SceneObject const& object() const noexcept    { return object_; }
 
-    void setPosition(glm::vec2 position) noexcept { emitterSettings_.object.position = position; }
+    void setPosition(glm::vec2 position) noexcept { object_.transform.position = position; }
 
 private:
 
@@ -58,11 +58,13 @@ private:
         std::size_t maxParticles = {1'000'000};
     } emittingSettings_;
 
-    struct EmitterSettings
-    {
-        SceneObject object;
-        bool visible {true};
-    } emitterSettings_;
+    SceneObject object_ {
+        .transform = {},
+        .shape     = Circle {},
+        .height    = 0.25F,
+        .color     = {0.30F, 0.70F, 0.45F, 1.0F},
+        .visible   = true,
+    };
 
     double spawnAccumulator_ {};
     RNG    rng_;

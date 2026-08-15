@@ -1,6 +1,5 @@
 #include "emitter.hpp"
 
-#include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <algorithm>
 
@@ -28,7 +27,7 @@ void Emitter::spawn(float dt)
         glm::vec2 direction {};
         rng_.unitVector(direction.x, direction.y);
 
-        pool_.positions[aliveCount_]  = emitterSettings_.object.position + jitter;
+        pool_.positions[aliveCount_]  = object_.transform.position + jitter;
         pool_.velocities[aliveCount_] = direction * rng_.range(0.1F, 1.5F);
         pool_.ages[aliveCount_]       = 0;
 
@@ -84,9 +83,7 @@ void Emitter::renderSettings()
 
     ImGui::SeparatorText("Body");
 
-    ImGui::Checkbox("Visible", &emitterSettings_.visible);
-    ImGui::SliderFloat2("Position", glm::value_ptr(emitterSettings_.object.position), -5.0F, 5.0F);
-    ImGui::SliderFloat("Radius", &emitterSettings_.object.radius, 0.0F, 2.0F);
+    renderSceneObjectSettings(object_);
 
     ImGui::End();
 }

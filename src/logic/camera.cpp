@@ -86,5 +86,8 @@ RenderView Camera::renderView(float aspect) const noexcept
         .depthReference = depthReference(),
         .right          = right(),
         .up             = up(),
+        .eye            = eye(),
+        .forward        = forward(),
+        .orthographic   = (projection == Projection::Orthographic),
     };
 }

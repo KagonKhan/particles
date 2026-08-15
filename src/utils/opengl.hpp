@@ -17,10 +17,10 @@
 #define PARTICLES_STRINGIFY(x)      PARTICLES_STRINGIFY_IMPL(x)
 
 
-static bool checkOpenGLError()
+[[nodiscard]] bool inline checkOpenGLError()
 {
-    bool foundError = false;
-    int  glErr      = glGetError();
+    bool   foundError = false;
+    GLenum glErr      = glGetError();
     while (glErr != GL_NO_ERROR) {
         spdlog::info("glError: {}", glErr);
         foundError = true;

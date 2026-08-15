@@ -17,8 +17,6 @@
 #include <numbers>
 #include <vector>
 
-class SceneObjectBase {}; // TODO: implement
-
 // Where the range starts fading out, as a fraction of the squared range — 0.64 is the
 // outer fifth of the radius, since the loop compares squared distances and 0.8^2 = 0.64.
 constexpr float kFadeBegins = 0.64F;
@@ -76,7 +74,7 @@ struct Simple
 class Attractor
 {
 public:
-    void setPosition(glm::vec2 position) { attractorSettings_.object.position = position; }
+    void setPosition(glm::vec2 position) { object_.transform.position = position; }
 
     void simpleUpdate(std::span<ParticleVector> particles, std::span<ParticleVector> velocities, float dt)
     {
@@ -84,7 +82,7 @@ public:
             auto& particle = particles[i];
 
             glm::vec2 offset =
-                attractorSettings_.object.position - particle;
+                object_.transform.position - particle;
 
             float distance2 = glm::dot(offset, offset);
 
@@ -110,7 +108,7 @@ public:
     //     float const     strength = settings_.strength.get();
     //     float const     rangeSq  = settings_.range.get() * settings_.range.get();
     //     float const     softenSq = settings_.softening.get() * settings_.softening.get();
-    //     glm::vec2 const centre   = attractorSettings_.object.position;
+    //     glm::vec2 const centre   = object_.transform.position;
 
     //     float const swirl    = glm::radians(settings_.swirl.get());
     //     float const swirlCos = std::cos(swirl);
@@ -153,25 +151,25 @@ public:
 
         ImGui::SeparatorText("Body");
 
-        attractorSettings_.visible.render();
-        ImGui::SliderFloat2("Position", glm::value_ptr(attractorSettings_.object.position), -5.0F, 5.0F);
-        ImGui::SliderFloat("Radius", &attractorSettings_.object.radius, 0.0F, 2.0F);
+        renderSceneObjectSettings(object_);
 
         ImGui::End();
     }
 
-    [[nodiscard]] bool               isVisible() const noexcept { return attractorSettings_.visible.get(); }
-    [[nodiscard]] SceneObject const& object() const noexcept    { return attractorSettings_.object; }
+    [[nodiscard]] bool               isVisible() const noexcept { return object_.visible; }
+    [[nodiscard]] SceneObject const& object() const noexcept    { return object_; }
 
 private:
     struct AttractingSettings : Simple
     {} settings_;
 
-    struct AttractorSettings
-    {
-        SceneObject object;
-        Knob<bool> visible {"Visible", true};
-    } attractorSettings_;
+    SceneObject object_ {
+        .transform = {},
+        .shape     = Circle {},
+        .height    = 0.25F,
+        .color     = {0.55F, 0.40F, 0.80F, 1.0F},
+        .visible   = true,
+    };
 
     RNG rng_;
 };

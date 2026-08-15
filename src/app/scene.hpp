@@ -9,9 +9,6 @@
 #include <span>
 #include <vector>
 
-// Everything that exists independently of how it is viewed: the particles themselves
-// and how long they have been simulated. The renderer contributes the camera and the GL
-// passes, so nothing here knows a projection exists.
 class Scene
 {
 public:
@@ -20,8 +17,6 @@ public:
 
     void spawn(float dt) { emitter_->spawn(dt); }
 
-    // Moves the emitter body. The renderer is what turns a cursor into a point in the
-    // plane, so the position arrives here already in world space.
     void placeEmitter(glm::vec2 position) { attractor_->setPosition(position); }
 
     [[nodiscard]] std::span<const ParticleVector> positions() const noexcept { return emitter_->data(); }

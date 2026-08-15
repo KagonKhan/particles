@@ -221,7 +221,7 @@ void Renderer::render(GLFWwindow* window, Scene& scene, float dt)
         splat_.renderSettings();
     }
 
-    spheres_.renderSettings();
+    shapes_.renderSettings();
 
     int w = 0;
     int h = 0;
@@ -233,7 +233,7 @@ void Renderer::render(GLFWwindow* window, Scene& scene, float dt)
     // Bodies first: they are the only opaque thing here, so they lay down the depth the
     // particles are then blended over.
     std::vector<SceneObject const*> objects = scene.getSceneObjects();
-    spheres_.draw(objects, view);
+    shapes_.draw(objects, view);
 
     // Before spawning, so a burst dragged across the screen lands under the cursor on the
     // same frame rather than trailing it by one.

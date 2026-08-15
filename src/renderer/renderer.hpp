@@ -5,8 +5,8 @@
 #include "renderer/particle_buffer.hpp"
 #include "renderer/point_pipeline.hpp"
 #include "renderer/render_view.hpp"
+#include "renderer/shape_pipeline.hpp"
 #include "renderer/splat_pipeline.hpp"
-#include "renderer/sphere_pipeline.hpp"
 
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float3.hpp>
@@ -41,7 +41,7 @@ private:
     SplatPipeline  splat_;
 
     // Scene bodies. Independent of the particle mode — both particle paths draw over it.
-    SpherePipeline spheres_;
+    ShapePipeline shapes_;
 
     // Sweeps yaw where the camera stands, which is a free camera's version of the orbit
     // this used to do.

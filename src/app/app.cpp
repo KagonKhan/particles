@@ -107,18 +107,18 @@ App::App(std::string const& title)
     );
 
     ShaderCache::compileProgram(
-        "SphereProgram",
+        "ShapeProgram",
         {
             ShaderCache::load(
-                "sphere_vertex",
+                "shape_vertex",
                 {
-                    .source = resource_string / "shaders/sphere.vert",
+                    .source = resource_string / "shaders/shape.vert",
                     .type   = GL_VERTEX_SHADER
                 }),
             ShaderCache::load(
-                "sphere_fragment",
+                "shape_fragment",
                 {
-                    .source = resource_string / "shaders/sphere.frag",
+                    .source = resource_string / "shaders/shape.frag",
                     .type   = GL_FRAGMENT_SHADER
                 }),
         }
@@ -175,7 +175,7 @@ void App::run(int fps)
 
     while (!glfwWindowShouldClose(window)) {
         glClearColor(0.0, 0.0, 0.0, 1.0);
-        // Depth too: the sphere pass is the one thing that depth tests, and a depth
+        // Depth too: the body pass is the one thing that depth tests, and a depth
         // buffer left over from the previous frame would occlude this frame's bodies.
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

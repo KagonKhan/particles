@@ -24,6 +24,13 @@ struct RenderView
     // a pipeline can face the camera without ever being handed the camera.
     glm::vec3 right {1.0F, 0.0F, 0.0F};
     glm::vec3 up {0.0F, 1.0F, 0.0F};
+
+    // Where the view rays come from, for a pipeline that traces them. Under perspective
+    // they all leave the eye and forward is only the centre of the fan; under an
+    // orthographic projection they run parallel along forward and the eye is a standoff.
+    glm::vec3 eye {0.0F, 0.0F, 1.0F};
+    glm::vec3 forward {0.0F, 0.0F, -1.0F};
+    bool      orthographic {false};
 };
 
 #endif // YARR_RENDER_VIEW_HPP

@@ -40,7 +40,7 @@ add_executable(${PROJECT}
     src/renderer/particle_buffer.cpp
     src/renderer/point_pipeline.cpp
     src/renderer/splat_pipeline.cpp
-    src/renderer/sphere_pipeline.cpp
+    src/renderer/shape_pipeline.cpp
 
     src/utils/logger.cpp
     src/utils/shader_cache.cpp
@@ -49,6 +49,8 @@ add_executable(${PROJECT}
     src/logic/camera.cpp
     src/logic/objects/attractor.hpp
     src/logic/knob.hpp
+    src/logic/shape.hpp
+    src/logic/scene_object.hpp
 )
 
 set_property(TARGET ${PROJECT} PROPERTY CXX_STANDARD 26)
