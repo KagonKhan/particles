@@ -25,8 +25,6 @@ constexpr float kTwoPi           = 2.0F * std::numbers::pi_v<float>;
 void Renderer::renderSettings(float dt)
 {
     ImGui::Begin("Renderer");
-    ImGui::Text("FPS: %f", 1.0F / dt);
-    ImGui::Text("DT: %f", dt);
 
     ImGui::SeparatorText("Mode");
 
@@ -238,8 +236,6 @@ void Renderer::render(GLFWwindow* window, Scene& scene, float dt)
     // Before spawning, so a burst dragged across the screen lands under the cursor on the
     // same frame rather than trailing it by one.
     dragEmitter(scene, view.viewProj, w, h);
-
-    scene.spawn(dt);
 
     // One upload, whichever pipeline consumes it, then one fence covering its draw.
     particles_.upload(scene.positions());

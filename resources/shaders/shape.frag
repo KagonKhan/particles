@@ -15,7 +15,7 @@ const uint kBox     = 1u;
 const uint kSegment = 2u;
 const uint kFrame   = 4u;
 
-const int kMaxSteps = 256;
+const int kMaxSteps = 32;
 
 in vec3       quadWorld;
 flat in vec2  bodyOrigin;

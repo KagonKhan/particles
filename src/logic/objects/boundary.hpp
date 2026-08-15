@@ -1,8 +1,8 @@
 #ifndef YARR_LOGIC_BOUNDARY_HPP
 #define YARR_LOGIC_BOUNDARY_HPP
 
-#include "emitter/emitter.hpp"
 #include "logic/behavior/behavior.hpp"
+#include "logic/particle_pool.hpp"
 #include "logic/scene_object.hpp"
 
 #include <imgui.h>

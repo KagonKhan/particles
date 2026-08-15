@@ -3,9 +3,9 @@
 #include <imgui.h>
 #include <algorithm>
 
-void Emitter::spawn(float dt)
+void Emitter::spawn(ParticlePool& pool, float dt)
 {
-    if (pool_.aliveCount >= emittingSettings_.maxParticles) {
+    if (pool.aliveCount >= emittingSettings_.maxParticles) {
         return;
     }
 
@@ -13,7 +13,7 @@ void Emitter::spawn(float dt)
     // Against the user's cap, not the pool's: clamping to MAX_PARTICLES let a single frame
     // overshoot whatever limit had been dialled in.
     int toSpawn = std::min(
-        static_cast<int>(emittingSettings_.maxParticles) - static_cast<int>(pool_.aliveCount),
+        static_cast<int>(emittingSettings_.maxParticles) - static_cast<int>(pool.aliveCount),
         static_cast<int>(spawnAccumulator_));
     spawnAccumulator_ -= toSpawn;
 
@@ -27,31 +27,31 @@ void Emitter::spawn(float dt)
         glm::vec2 direction {};
         rng_.unitVector(direction.x, direction.y);
 
-        pool_.positions[pool_.aliveCount]  = object_.transform.position + jitter;
-        pool_.velocities[pool_.aliveCount] = direction * rng_.range(0.1F, 1.5F);
-        pool_.ages[pool_.aliveCount]       = 0;
+        pool.positions[pool.aliveCount]  = object_.transform.position + jitter;
+        pool.velocities[pool.aliveCount] = direction * rng_.range(0.1F, 1.5F);
+        pool.ages[pool.aliveCount]       = 0;
 
-        ++pool_.aliveCount;
+        ++pool.aliveCount;
     }
 }
 
-void Emitter::update(float dt)
+void Emitter::update(ParticlePool& pool, float dt)
 {
-    for (std::size_t i {0}; i < pool_.aliveCount; ++i) {
-        pool_.positions[i] += pool_.velocities[i] * dt;
+    for (std::size_t i {0}; i < pool.aliveCount; ++i) {
+        pool.positions[i] += pool.velocities[i] * dt;
     }
 
 
     std::size_t i = 0;
 
-    while (i < pool_.aliveCount) {
-        pool_.ages[i] += dt;
-        if (pool_.ages[i] >= emittingSettings_.maxAge) {
-            --pool_.aliveCount;
+    while (i < pool.aliveCount) {
+        pool.ages[i] += dt;
+        if (pool.ages[i] >= emittingSettings_.maxAge) {
+            --pool.aliveCount;
 
-            pool_.positions[i]  = pool_.positions[pool_.aliveCount];
-            pool_.velocities[i] = pool_.velocities[pool_.aliveCount];
-            pool_.ages[i]       = pool_.ages[pool_.aliveCount];
+            pool.positions[i]  = pool.positions[pool.aliveCount];
+            pool.velocities[i] = pool.velocities[pool.aliveCount];
+            pool.ages[i]       = pool.ages[pool.aliveCount];
         }
         else {
             ++i;
@@ -59,11 +59,11 @@ void Emitter::update(float dt)
     }
 }
 
-void Emitter::renderSettings()
+void Emitter::renderSettings(ParticlePool& pool)
 {
     ImGui::Begin("Emitter Settings");
 
-    ImGui::Text("Active particles: %zu", pool_.aliveCount);
+    ImGui::Text("Active particles: %zu", pool.aliveCount);
     ImGui::Checkbox("Update", &emittingSettings_.enabled);
     ImGui::SliderFloat("Spawn rate", &emittingSettings_.spawnRate, 0.0F, 10'000, "%.0f /sec");
     ImGui::SliderFloat("Lifetime", &emittingSettings_.maxAge, 0.1F, 100.0F, "%.2f s");
@@ -78,7 +78,7 @@ void Emitter::renderSettings()
         &maxParticles
     );
     if (ImGui::Button("Kill")) {
-        pool_.aliveCount = 0;
+        pool.aliveCount = 0;
     }
 
     ImGui::SeparatorText("Body");

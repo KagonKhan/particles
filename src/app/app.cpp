@@ -26,6 +26,16 @@ const ImGuiWindowFlags window_flags    =
 ;
 
 
+// How much of a frame's own timing shows up in the readout. Low enough that a single slow
+// frame nudges the number rather than throwing it.
+constexpr float kFrameTimeSmoothing = 0.05F;
+
+// A frame that cannot afford this many simulation steps stops trying to catch up. Without
+// a ceiling, a frame that runs long asks for more steps, which makes the next frame run
+// longer still.
+constexpr int kMaxStepsPerFrame = 8;
+
+
 void glfw_error_callback(int error, const char* description)
 {
     spdlog::error("Glfw Error {}: {}\n", error, description);
@@ -169,7 +179,7 @@ App::~App()
     glfwTerminate();
 }
 
-void App::run(int fps)
+void App::run()
 {
     auto previousFrame = Time::measure();
 
@@ -185,7 +195,8 @@ void App::run(int fps)
         float dt  = std::max(
             1e-6F,
             static_cast<float>(Time::duration<std::chrono::nanoseconds>(previousFrame, now).count()) / 1e9F);
-        previousFrame = now;
+        previousFrame          = now;
+        smoothedFrameTime_    += (dt - smoothedFrameTime_) * kFrameTimeSmoothing;
 
         glfwPollEvents();
         if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0) {
@@ -206,10 +217,11 @@ void App::run(int fps)
         ImGuiID dockspace_id = ImGui::GetID("RootDockSpace");
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
-        // Simulate first, then draw: the renderer's mouse spawns land in the pool the
-        // same frame they are made, rather than waiting a frame to appear.
-        scene.update(dt);
+        // Simulate first, then draw: whatever the steps did lands in the pool the renderer
+        // uploads below, rather than waiting a frame to appear.
+        stepSimulation(dt);
         scene.renderSettings();
+        renderStats();
 
         renderer->render(window, scene, dt);
 
@@ -221,6 +233,47 @@ void App::run(int fps)
 
         finishFrame();
     }
+}
+
+void App::stepSimulation(float dt)
+{
+    // Every step is the same length whatever the frame took, so the simulation sees a
+    // steady clock: a hitching frame becomes several steps rather than one enormous one,
+    // and a frame rate far above the simulation rate becomes no step at all.
+    float const step = 1.0F / simulationRate_;
+
+    simulationAccumulator_ += dt;
+
+    stepsLastFrame_ = 0;
+    while ((simulationAccumulator_ >= step) && (stepsLastFrame_ < kMaxStepsPerFrame)) {
+        scene.update(step);
+        simulationAccumulator_ -= step;
+        ++stepsLastFrame_;
+    }
+
+    // Only reachable by hitting the ceiling above. Keeping the backlog would spend every
+    // later frame at the cap trying to work off time it can never make up, so the
+    // simulation drops it and falls behind the wall clock instead.
+    if (simulationAccumulator_ >= step) {
+        simulationAccumulator_ = 0.0F;
+    }
+}
+
+void App::renderStats()
+{
+    ImGui::Begin("Performance");
+
+    ImGui::Text("FPS: %.1f", 1.0F / smoothedFrameTime_);
+    ImGui::Text("Frame: %.3f ms", smoothedFrameTime_ * 1000.0F);
+
+    ImGui::SeparatorText("Simulation");
+
+    ImGui::SliderFloat("Rate", &simulationRate_, 1.0F, 480.0F, "%.0f Hz", ImGuiSliderFlags_AlwaysClamp);
+    ImGui::SetItemTooltip("How often the simulation steps, independent of the frame rate");
+    ImGui::Text("Step: %.3f ms", 1000.0F / simulationRate_);
+    ImGui::Text("Steps this frame: %d", stepsLastFrame_);
+
+    ImGui::End();
 }
 
 void App::startNewFrame()

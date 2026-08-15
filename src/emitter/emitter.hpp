@@ -1,44 +1,23 @@
 #ifndef YARR_EMITTER_HPP
 #define YARR_EMITTER_HPP
 
+#include "logic/particle_pool.hpp"
 #include "logic/scene_object.hpp"
 #include "utils/rng.hpp"
 
 #include <glm/ext/vector_float2.hpp>
 
-#include <array>
 #include <cstddef>
-#include <span>
 
 
-static constexpr std::size_t MAX_PARTICLES = 1'000'000;
-
-
-// The simulation is flat: a particle has a position and a velocity in the plane, and
-// nothing here can take it out of that plane. The camera is free to look at the plane
-// from wherever it likes — that is the renderer's business, not the emitter's.
-using ParticleVector = glm::vec2;
-struct ParticlePool
-{
-    std::array<ParticleVector, MAX_PARTICLES> positions {};
-    std::array<ParticleVector, MAX_PARTICLES> velocities {};
-    std::array<float, MAX_PARTICLES> ages {};
-
-    std::size_t aliveCount {};
-};
-
-
+// The pool arrives per call rather than being held: the scene owns the particles, and an
+// emitter is only one of the things allowed to write into them.
 class Emitter
 {
 public:
-    void spawn(float dt);
-    void update(float dt);
-    void renderSettings();
-
-    [[nodiscard]]
-    std::span<ParticleVector>  data() noexcept       { return {pool_.positions.data(), pool_.aliveCount}; }
-    std::span<ParticleVector>  velocity() noexcept   { return {pool_.velocities.data(), pool_.aliveCount}; }
-    [[nodiscard]] float const* ages() const noexcept { return pool_.ages.data(); }
+    void spawn(ParticlePool& pool, float dt);
+    void update(ParticlePool& pool, float dt);
+    void renderSettings(ParticlePool& pool);
 
     // Whether the simulation is advancing. The scene owns the decision to skip a step, so
     // that everything acting on the pool is paused together rather than each in isolation.
@@ -48,11 +27,7 @@ public:
 
     void setPosition(glm::vec2 position) noexcept { object_.transform.position = position; }
 
-    ParticlePool& getPool() noexcept { return pool_; }
-
 private:
-
-    ParticlePool pool_ {};
 
     struct EmittingSettings
     {

@@ -1,7 +1,7 @@
 #ifndef YARR_PARTICLE_BUFFER_HPP
 #define YARR_PARTICLE_BUFFER_HPP
 
-#include "emitter/emitter.hpp"
+#include "logic/particle_pool.hpp"
 
 #include <GL/glew.h>
 

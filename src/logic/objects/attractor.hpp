@@ -2,8 +2,8 @@
 #define YARR_LOGIC_ATTRACTOR_HPP
 
 
-#include "emitter/emitter.hpp"
 #include "logic/knob.hpp"
+#include "logic/particle_pool.hpp"
 #include "logic/scene_object.hpp"
 #include "utils/rng.hpp"
 #include <glm/common.hpp>
@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <numbers>
+#include <span>
 #include <vector>
 
 // Where the range starts fading out, as a fraction of the squared range — 0.64 is the
@@ -76,8 +77,11 @@ class Attractor
 public:
     void setPosition(glm::vec2 position) { object_.transform.position = position; }
 
-    void simpleUpdate(std::span<ParticleVector> particles, std::span<ParticleVector> velocities, float dt)
+    void simpleUpdate(ParticlePool& pool, float dt)
     {
+        std::span<ParticleVector> particles  = pool.alivePositions();
+        std::span<ParticleVector> velocities = pool.aliveVelocities();
+
         for (std::size_t i {}; i < particles.size(); ++i) {
             auto& particle = particles[i];
 
@@ -136,9 +140,9 @@ public:
     //     }
     // }
 
-    void update(std::span<ParticleVector> particles, std::span<ParticleVector> velocities, float dt)
+    void update(ParticlePool& pool, float dt)
     {
-        simpleUpdate(particles, velocities, dt);
+        simpleUpdate(pool, dt);
     }
 
     void renderSettings()

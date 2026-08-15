@@ -51,6 +51,7 @@ add_executable(${PROJECT}
     src/logic/objects/boundary.hpp
     src/logic/behavior/behavior.hpp
     src/logic/knob.hpp
+    src/logic/particle_pool.hpp
     src/logic/shape.hpp
     src/logic/scene_object.hpp
 )
