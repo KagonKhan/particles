@@ -55,7 +55,7 @@ private:
     // a million particles, so building it costs nothing next to what it describes.
     std::vector<ParticleChunk> chunks_;
 
-    std::size_t chunkParticles_ {kChunkParticles};
+    std::size_t chunkParticles_ {CHUNK_PARTICLES};
     bool        parallel_ {true};
     bool        pinned_ {false};
 

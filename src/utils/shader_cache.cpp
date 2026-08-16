@@ -15,9 +15,9 @@
 namespace
 {
 
-std::filesystem::path      resource_string   = PARTICLES_STRINGIFY(RESOURCE_DIR);
-constexpr std::string_view kIncludeDirective = "#include";
-constexpr int              kMaxIncludeDepth  = 8;
+std::filesystem::path      RESOURCE_ROOT     = PARTICLES_STRINGIFY(RESOURCE_DIR);
+constexpr std::string_view INCLUDE_DIRECTIVE = "#include";
+constexpr int              MAX_INCLUDE_DEPTH = 8;
 
 [[nodiscard]] std::string_view trimLeft(std::string_view text)
 {
@@ -31,11 +31,11 @@ constexpr int              kMaxIncludeDepth  = 8;
 {
     std::string_view rest = trimLeft(line);
 
-    if (!rest.starts_with(kIncludeDirective)) {
+    if (!rest.starts_with(INCLUDE_DIRECTIVE)) {
         return {};
     }
 
-    rest = trimLeft(rest.substr(kIncludeDirective.size()));
+    rest = trimLeft(rest.substr(INCLUDE_DIRECTIVE.size()));
 
     if (!rest.starts_with('"')) {
         return {};
@@ -57,11 +57,11 @@ constexpr int              kMaxIncludeDepth  = 8;
 // 4.40 driver the reported line may be one out. It is diagnostics either way.
 [[nodiscard]] std::string resolveIncludes(std::filesystem::path const& path, int depth = 0)
 {
-    if (depth > kMaxIncludeDepth) {
+    if (depth > MAX_INCLUDE_DEPTH) {
         throw ShaderError(
                   "{}: #include nested more than {} deep, which is a cycle in all but name",
                   path.string(),
-                  kMaxIncludeDepth);
+                  MAX_INCLUDE_DEPTH);
     }
 
     std::istringstream source {fileToString(path)};
@@ -226,13 +226,13 @@ DefaultShaders::DefaultShaders()
             ShaderCache::load(
                 "point_vertex",
                 {
-                    .source = resource_string / "shaders/point.vert",
+                    .source = RESOURCE_ROOT / "shaders/point.vert",
                     .type   = GL_VERTEX_SHADER
                 }),
             ShaderCache::load(
                 "point_fragment",
                 {
-                    .source = resource_string / "shaders/point.frag",
+                    .source = RESOURCE_ROOT / "shaders/point.frag",
                     .type   = GL_FRAGMENT_SHADER
                 }),
         }
@@ -244,13 +244,13 @@ DefaultShaders::DefaultShaders()
             ShaderCache::load(
                 "shape_vertex",
                 {
-                    .source = resource_string / "shaders/shape.vert",
+                    .source = RESOURCE_ROOT / "shaders/shape.vert",
                     .type   = GL_VERTEX_SHADER
                 }),
             ShaderCache::load(
                 "shape_fragment",
                 {
-                    .source = resource_string / "shaders/shape.frag",
+                    .source = RESOURCE_ROOT / "shaders/shape.frag",
                     .type   = GL_FRAGMENT_SHADER
                 }),
         }
@@ -262,7 +262,7 @@ DefaultShaders::DefaultShaders()
             ShaderCache::load(
                 "splat_compute",
                 {
-                    .source = resource_string / "shaders/splat.comp",
+                    .source = RESOURCE_ROOT / "shaders/splat.comp",
                     .type   = GL_COMPUTE_SHADER
                 })
         }
@@ -274,13 +274,13 @@ DefaultShaders::DefaultShaders()
             ShaderCache::load(
                 "fullscreen_vertex",
                 {
-                    .source = resource_string / "shaders/fullscreen.vert",
+                    .source = RESOURCE_ROOT / "shaders/fullscreen.vert",
                     .type   = GL_VERTEX_SHADER
                 }),
             ShaderCache::load(
                 "density_fragment",
                 {
-                    .source = resource_string / "shaders/density.frag",
+                    .source = RESOURCE_ROOT / "shaders/density.frag",
                     .type   = GL_FRAGMENT_SHADER
                 }),
         }

@@ -20,7 +20,7 @@
 
 // Where the range starts fading out, as a fraction of the squared range — 0.64 is the
 // outer fifth of the radius, since the loop compares squared distances and 0.8^2 = 0.64.
-constexpr float kFadeBegins = 0.64F;
+constexpr float FADE_BEGINS = 0.64F;
 
 // Raising a float to a small integer power. std::pow takes its slow general path for a
 // float exponent, and this runs once per particle per frame — at a million particles that
@@ -84,16 +84,16 @@ public:
         // Read once for the chunk. Out of the loop these are constants the compiler can keep
         // in registers; inside it, each is a load through `this` that it has to assume any
         // write to a particle might have invalidated.
-        glm::vec2 const centre  = object_.transform.position;
-        float const     rangeSq = settings_.range.get() * settings_.range.get();
-        float const     scale   = settings_.strength.get();
-        float const     power   = -settings_.inversePower.get();
+        glm::vec2 const centre   = object_.transform.position;
+        float const     range_sq = settings_.range.get() * settings_.range.get();
+        float const     scale    = settings_.strength.get();
+        float const     power    = -settings_.inversePower.get();
 
         for (std::size_t i {}; i < chunk.size(); ++i) {
             glm::vec2 const offset    = centre - chunk.positions[i];
             float const     distance2 = glm::dot(offset, offset);
 
-            if (distance2 > rangeSq) {
+            if (distance2 > range_sq) {
                 continue;
             }
 
@@ -110,35 +110,35 @@ public:
 
     // void advancedUpdate(std::span<ParticleVector> particles, std::span<ParticleVector> velocities, float dt)
     // {
-    //     int const       power    = settings_.falloffPower.get();
-    //     float const     strength = settings_.strength.get();
-    //     float const     rangeSq  = settings_.range.get() * settings_.range.get();
-    //     float const     softenSq = settings_.softening.get() * settings_.softening.get();
-    //     glm::vec2 const centre   = object_.transform.position;
+    //     int const       power     = settings_.falloffPower.get();
+    //     float const     strength  = settings_.strength.get();
+    //     float const     range_sq  = settings_.range.get() * settings_.range.get();
+    //     float const     soften_sq = settings_.softening.get() * settings_.softening.get();
+    //     glm::vec2 const centre    = object_.transform.position;
 
-    //     float const swirl    = glm::radians(settings_.swirl.get());
-    //     float const swirlCos = std::cos(swirl);
-    //     float const swirlSin = std::sin(swirl);
+    //     float const swirl     = glm::radians(settings_.swirl.get());
+    //     float const swirl_cos = std::cos(swirl);
+    //     float const swirl_sin = std::sin(swirl);
 
-    //     float const dragFactor = std::exp(-settings_.damping.get() * dt);
+    //     float const drag_factor = std::exp(-settings_.damping.get() * dt);
 
     //     for (std::size_t i {}; i < particles.size(); ++i) {
-    //         glm::vec2 const offset     = centre - particles[i];
-    //         float const     distanceSq = glm::dot(offset, offset);
+    //         glm::vec2 const offset      = centre - particles[i];
+    //         float const     distance_sq = glm::dot(offset, offset);
 
     //         // Squared on both sides, so deciding who is in range costs no square root.
-    //         if (distanceSq > rangeSq) {
+    //         if (distance_sq > range_sq) {
     //             continue;
     //         }
 
-    //         float const     window      = 1.0F - glm::smoothstep(kFadeBegins, 1.0F, distanceSq / rangeSq);
-    //         float const     invDistance = 1.0F / std::sqrt(distanceSq + softenSq);
+    //         float const     window       = 1.0F - glm::smoothstep(FADE_BEGINS, 1.0F, distance_sq / range_sq);
+    //         float const     inv_distance = 1.0F / std::sqrt(distance_sq + soften_sq);
     //         glm::vec2 const pull {
-    //             (offset.x * swirlCos) - (offset.y * swirlSin),
-    //             (offset.x * swirlSin) + (offset.y * swirlCos)};
+    //             (offset.x * swirl_cos) - (offset.y * swirl_sin),
+    //             (offset.x * swirl_sin) + (offset.y * swirl_cos)};
 
-    //         velocities[i] += pull * (strength * intPow(invDistance, power + 1) * window) * dt;
-    //         velocities[i] *= 1.0F + ((dragFactor - 1.0F) * window);
+    //         velocities[i] += pull * (strength * intPow(inv_distance, power + 1) * window) * dt;
+    //         velocities[i] *= 1.0F + ((drag_factor - 1.0F) * window);
     //     }
     // }
 
@@ -177,7 +177,7 @@ private:
         .visible    = true,
     };
 
-    RNG rng_;
+    Rng rng_;
 };
 
 

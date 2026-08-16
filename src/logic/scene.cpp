@@ -117,17 +117,17 @@ void Scene::renderTuning()
         chunkParticles_ = static_cast<std::size_t>(std::max(chunk, 1));
     }
 
-    std::size_t const chunkBytes = chunkParticles_ * kChunkBytesPerParticle;
+    std::size_t const chunk_bytes = chunkParticles_ * CHUNK_BYTES_PER_PARTICLE;
 
-    ImGui::Text("%zu KiB per chunk", chunkBytes / 1024);
+    ImGui::Text("%zu KiB per chunk", chunk_bytes / 1024);
     ImGui::SameLine();
 
     // Which cache a chunk actually lands in is the only thing the number means. Said out
     // loud, since it is not recoverable from the slider.
-    if (chunkBytes <= machine.l1dBytes) {
+    if (chunk_bytes <= machine.l1dBytes) {
         ImGui::TextDisabled("(fits L1d, %zu KiB)", machine.l1dBytes / 1024);
     }
-    else if (chunkBytes <= machine.l2Bytes) {
+    else if (chunk_bytes <= machine.l2Bytes) {
         ImGui::TextDisabled("(spills to L2, %zu KiB)", machine.l2Bytes / 1024);
     }
     else {
@@ -135,7 +135,7 @@ void Scene::renderTuning()
     }
 
     if (ImGui::SmallButton("Fit L1d")) {
-        chunkParticles_ = std::max<std::size_t>(64, machine.particlesPerCache(kChunkBytesPerParticle) / 2);
+        chunkParticles_ = std::max<std::size_t>(64, machine.particlesPerCache(CHUNK_BYTES_PER_PARTICLE) / 2);
     }
 
     ImGui::SetItemTooltip("Half of L1d, leaving room for what the objects themselves touch");
@@ -169,8 +169,8 @@ void Scene::renderTuning()
         // one last-level cache has nothing to pin against; a guest is merely unable to see
         // what its host has.
         ImGui::BeginDisabled();
-        bool nothingToPin = false;
-        ImGui::Checkbox("Pin to largest cache", &nothingToPin);
+        bool nothing_to_pin = false;
+        ImGui::Checkbox("Pin to largest cache", &nothing_to_pin);
         ImGui::EndDisabled();
 
         if (machine.virtualized.empty()) {

@@ -37,7 +37,7 @@ Each scene object used to own a loop over the whole pool. The pool is ~20 MB, so
 paid to pull the same particles back in, and cost grew with the *scene* rather than with the
 physics.
 
-`Scene::update` now owns one loop. The pool is sliced into `kChunkParticles` chunks and each
+`Scene::update` now owns one loop. The pool is sliced into `CHUNK_PARTICLES` chunks and each
 slice is given to every object in turn:
 
 ```cpp
@@ -100,7 +100,7 @@ Best configuration measured: **16 vCPUs, unpinned, parallel, chunk 1024 → 372.
 
 † drifted +9.1% within the run against ±3% everywhere else — treat as contaminated.
 
-**`kChunkParticles = 1024` is validated**: best in both modes.
+**`CHUNK_PARTICLES = 1024` is validated**: best in both modes.
 
 Serial shows the L1d story cleanly — cost rises monotonically as the chunk approaches and
 exceeds the 32 KiB L1d (+3.9% at 28 KiB, +4.4% at 31 KiB, +6.4% at 1 MiB). The effect is small

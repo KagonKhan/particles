@@ -1,6 +1,6 @@
 #include "utils/imgui_utils.hpp"
 
-namespace ImGuiUtils
+namespace imgui_utils
 {
 namespace
 {
@@ -12,8 +12,8 @@ float labelWidth(char const* label)
 
 } // namespace
 
-FlowLayout::FlowLayout(float itemWidth) noexcept
-    : itemWidth_{itemWidth},
+FlowLayout::FlowLayout(float item_width) noexcept
+    : itemWidth_{item_width},
       rightEdge_{ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x}
 {}
 
@@ -36,16 +36,16 @@ void FlowLayout::field(KnobBase& knob)
     knob.render();
 }
 
-void FlowLayout::sameLineIfFits(float nextWidth)
+void FlowLayout::sameLineIfFits(float next_width)
 {
     if (!started_) {
         started_ = true;
         return;
     }
 
-    if ((ImGui::GetItemRectMax().x + ImGui::GetStyle().ItemSpacing.x + nextWidth) <= rightEdge_) {
+    if ((ImGui::GetItemRectMax().x + ImGui::GetStyle().ItemSpacing.x + next_width) <= rightEdge_) {
         ImGui::SameLine();
     }
 }
 
-} // namespace ImGuiUtils
+} // namespace imgui_utils

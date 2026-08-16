@@ -45,10 +45,10 @@ struct DeltaTimeClock
         auto  now = Time::measure();
         float dt  = std::max(
             1e-6F,
-            static_cast<float>(Time::duration<std::chrono::nanoseconds>(previousFrame, now).count()) / 1e9F);
+            static_cast<float>(Time::duration<std::chrono::nanoseconds>(previousFrame_, now).count()) / 1e9F);
 
-        previousFrame       = now;
-        smoothedFrameTime_ += (dt - smoothedFrameTime_) * kFrameTimeSmoothing;
+        previousFrame_      = now;
+        smoothedFrameTime_ += (dt - smoothedFrameTime_) * FRAME_TIME_SMOOTHING;
 
         return smoothedFrameTime_;
     }
@@ -56,9 +56,9 @@ struct DeltaTimeClock
     [[nodiscard]] float get() const noexcept { return smoothedFrameTime_; }
 
 private:
-    static constexpr float kFrameTimeSmoothing = 0.05F;
+    static constexpr float FRAME_TIME_SMOOTHING = 0.05F;
 
-    std::chrono::high_resolution_clock::time_point previousFrame = Time::measure();
+    std::chrono::high_resolution_clock::time_point previousFrame_ = Time::measure();
 
     float smoothedFrameTime_ = 1.0F / 60.0F;
 };

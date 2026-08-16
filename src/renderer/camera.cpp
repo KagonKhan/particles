@@ -5,13 +5,13 @@
 namespace
 {
 
-constexpr glm::vec3 kWorldUp {0.0F, 1.0F, 0.0F};
+constexpr glm::vec3 WORLD_UP {0.0F, 1.0F, 0.0F};
 
 // An orthographic eye position is arbitrary along the view axis — zoom comes from the box
 // size, not the standoff. Backing the eye off keeps every particle in front of the camera
 // plane so the depth term stays positive, and the far plane covers a long-lived cloud.
-constexpr float kOrthoStandoff = 50.0F;
-constexpr float kOrthoFar      = 500.0F;
+constexpr float ORTHO_STANDOFF = 50.0F;
+constexpr float ORTHO_FAR      = 500.0F;
 
 } // namespace
 
@@ -22,7 +22,7 @@ glm::vec3 Camera::forward() const noexcept
 
 glm::vec3 Camera::right() const noexcept
 {
-    return glm::normalize(glm::cross(forward(), kWorldUp));
+    return glm::normalize(glm::cross(forward(), WORLD_UP));
 }
 
 glm::vec3 Camera::up() const noexcept
@@ -34,8 +34,8 @@ glm::vec3 Camera::eye() const noexcept
 {
     // Under perspective the eye is simply where the camera is. Orthographic backs it off
     // along the view axis, which no more moves the picture than sliding a projector back.
-    if (projection == Projection::Orthographic) {
-        return position - (forward() * kOrthoStandoff);
+    if (projection == Projection::ORTHOGRAPHIC) {
+        return position - (forward() * ORTHO_STANDOFF);
     }
 
     return position;
@@ -49,7 +49,7 @@ glm::vec3 Camera::focusPoint() const noexcept
 glm::mat4 Camera::view() const noexcept
 {
     glm::vec3 from = eye();
-    return glm::lookAt(from, from + forward(), kWorldUp);
+    return glm::lookAt(from, from + forward(), WORLD_UP);
 }
 
 float Camera::depthReference() const noexcept
@@ -61,14 +61,14 @@ float Camera::depthReference() const noexcept
 
 glm::mat4 Camera::viewProj(float aspect) const noexcept
 {
-    if (projection == Projection::Orthographic) {
+    if (projection == Projection::ORTHOGRAPHIC) {
         // Size the box to the vertical extent the perspective view would show at the
         // focus plane, so flipping between 2D and 3D doesn't jump the cloud's on-screen
         // scale and the same Focus/FOV sliders keep working in both.
-        float halfHeight = focusDistance * std::tan(glm::radians(fovDegrees) * 0.5F);
-        float halfWidth  = halfHeight * aspect;
+        float half_height = focusDistance * std::tan(glm::radians(fovDegrees) * 0.5F);
+        float half_width  = half_height * aspect;
 
-        glm::mat4 proj = glm::ortho(-halfWidth, halfWidth, -halfHeight, halfHeight, 0.01F, kOrthoFar);
+        glm::mat4 proj = glm::ortho(-half_width, half_width, -half_height, half_height, 0.01F, ORTHO_FAR);
         return proj * view();
     }
 
@@ -88,6 +88,6 @@ RenderView Camera::renderView(float aspect) const noexcept
         .up             = up(),
         .eye            = eye(),
         .forward        = forward(),
-        .orthographic   = (projection == Projection::Orthographic),
+        .orthographic   = (projection == Projection::ORTHOGRAPHIC),
     };
 }

@@ -7,14 +7,14 @@
 namespace
 {
 
-constexpr GLbitfield kStorageFlags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+constexpr GLbitfield STORAGE_FLAGS = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
 
 void* createMappedStorage(GLuint buffer, GLsizeiptr bytes)
 {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER, bytes, nullptr, kStorageFlags);
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, bytes, nullptr, STORAGE_FLAGS);
 
-    void* ptr = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, bytes, kStorageFlags);
+    void* ptr = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, bytes, STORAGE_FLAGS);
     if (ptr == nullptr) {
         throw std::runtime_error("Failed to map particle buffer");
     }
@@ -26,16 +26,16 @@ void* createMappedStorage(GLuint buffer, GLsizeiptr bytes)
 
 ParticleBuffer::ParticleBuffer()
 {
-    glGenBuffers(kBufferCount, buffers_.data());
+    glGenBuffers(BUFFER_COUNT, buffers_.data());
 
-    for (std::size_t i = 0; i < kBufferCount; ++i) {
+    for (std::size_t i = 0; i < BUFFER_COUNT; ++i) {
         mapped_[i] = createMappedStorage(buffers_[i], MAX_PARTICLES * sizeof(ParticleVector));
     }
 }
 
 ParticleBuffer::~ParticleBuffer()
 {
-    for (std::size_t i = 0; i < kBufferCount; ++i) {
+    for (std::size_t i = 0; i < BUFFER_COUNT; ++i) {
         if (fences_[i] != nullptr) {
             glDeleteSync(fences_[i]);
         }
@@ -46,12 +46,12 @@ ParticleBuffer::~ParticleBuffer()
         }
     }
 
-    glDeleteBuffers(kBufferCount, buffers_.data());
+    glDeleteBuffers(BUFFER_COUNT, buffers_.data());
 }
 
 GLuint ParticleBuffer::upload(std::span<const ParticleVector> positions)
 {
-    current_ = (current_ + 1) % kBufferCount;
+    current_ = (current_ + 1) % BUFFER_COUNT;
 
     if (fences_[current_] != nullptr) {
         GLenum result = glClientWaitSync(fences_[current_], GL_SYNC_FLUSH_COMMANDS_BIT, 1'000'000'000);

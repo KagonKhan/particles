@@ -19,15 +19,15 @@
 
 [[nodiscard]] bool inline checkOpenGLError()
 {
-    bool   foundError = false;
-    GLenum glErr      = glGetError();
-    while (glErr != GL_NO_ERROR) {
-        spdlog::info("glError: {}", glErr);
-        foundError = true;
-        glErr      = glGetError();
+    bool   found_error = false;
+    GLenum gl_err      = glGetError();
+    while (gl_err != GL_NO_ERROR) {
+        spdlog::info("glError: {}", gl_err);
+        found_error = true;
+        gl_err      = glGetError();
     }
 
-    return foundError;
+    return found_error;
 }
 
 #endif // YARR_UTILS_OPENGL_HPP

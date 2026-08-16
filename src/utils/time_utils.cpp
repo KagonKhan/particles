@@ -5,7 +5,7 @@
 #include <exception>
 #include <iterator>
 
-namespace TimeUtils
+namespace time_utils
 {
 namespace
 {
@@ -43,4 +43,4 @@ void appendLocalTime(std::string& out, std::chrono::system_clock::time_point whe
     }
 }
 
-} // namespace TimeUtils
+} // namespace time_utils

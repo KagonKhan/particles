@@ -17,7 +17,7 @@
 class App : public Immovable<App>
 {
 public:
-    App(std::string const& title, std::shared_ptr<ImGuiConsoleSink> logSink);
+    App(std::string const& title, std::shared_ptr<ImGuiConsoleSink> log_sink);
 
     void run();
 
@@ -31,7 +31,7 @@ private:
 
     std::unique_ptr<Renderer> renderer_ {new Renderer};
     std::unique_ptr<Scene>    scene_ {new Scene};
-    DeltaTimeClock            clock;
+    DeltaTimeClock            clock_;
 
     Knob<int> simulationRate_ {
         "Simulation Rate", 120, 0, 480, "%d Hz",
@@ -42,7 +42,7 @@ private:
         "Most steps one frame may take. Holding real time needs rate / FPS of them;\nbelow that the simulation runs slow rather than stalling the interface."
     };
 
-    OutputConsole console;
+    OutputConsole console_;
 
     float       physicsUpdateAccumulator_ = 0.0F;
     std::size_t simulationStepsTaken_     = 0;

@@ -11,7 +11,7 @@ namespace
 
 // In font sizes. A menu fits itself to what is in it, and a slider left to its own devices
 // asks for the width of the window it is in, which between them size nothing sensibly.
-constexpr float kItemWidth = 9.0F;
+constexpr float ITEM_WIDTH = 9.0F;
 
 } // namespace
 
@@ -40,7 +40,7 @@ void Settings::render()
         }
 
         for (Entry& entry : menu.entries) {
-            ImGui::SetNextItemWidth(ImGui::GetFontSize() * kItemWidth);
+            ImGui::SetNextItemWidth(ImGui::GetFontSize() * ITEM_WIDTH);
             entry.knob->render();
 
             if (entry.tooltip != nullptr) {

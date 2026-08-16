@@ -46,11 +46,11 @@ public:
 private:
     // Frames of latency between writing a mapped buffer and the GPU being done reading
     // it. Three is enough that the fence is essentially never hit.
-    static constexpr std::size_t kBufferCount {3};
+    static constexpr std::size_t BUFFER_COUNT {3};
 
-    std::array<GLuint, kBufferCount> buffers_ {};
-    std::array<void*, kBufferCount>  mapped_ {};
-    std::array<GLsync, kBufferCount> fences_ {};
+    std::array<GLuint, BUFFER_COUNT> buffers_ {};
+    std::array<void*, BUFFER_COUNT>  mapped_ {};
+    std::array<GLsync, BUFFER_COUNT> fences_ {};
 
     std::size_t current_ {0};
     GLuint      count_ {0};

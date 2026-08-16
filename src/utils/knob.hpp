@@ -17,7 +17,7 @@
 
 
 template <typename T>
-constexpr ImGuiDataType kDataType = [] {
+constexpr ImGuiDataType DATA_TYPE = [] {
         if constexpr (std::is_same_v<T, float>) {
             return ImGuiDataType_Float;
         }
@@ -121,7 +121,7 @@ public:
     {
         ImGui::PushID(id());
 
-        bool changed = ImGui::SliderScalar(name(), kDataType<T>, &value_, &low_, &high_, format_, flags_);
+        bool changed = ImGui::SliderScalar(name(), DATA_TYPE<T>, &value_, &low_, &high_, format_, flags_);
 
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             value_  = default_;
@@ -227,7 +227,7 @@ private:
 
 
 // A choice out of a fixed list of names, rendered as a combo. The options are borrowed —
-// they are meant to be a static table, like kShapeNames, that outlives the knob.
+// they are meant to be a static table, like SHAPE_NAMES, that outlives the knob.
 template <>
 class Knob<char const*> final : public KnobBase
 {

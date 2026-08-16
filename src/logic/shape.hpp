@@ -23,21 +23,21 @@
 
 struct Circle
 {
-    static constexpr char const* kName = "Circle";
+    static constexpr char const* NAME = "Circle";
 
     float radius {0.25F};
 };
 
 struct Box
 {
-    static constexpr char const* kName = "Box";
+    static constexpr char const* NAME = "Box";
 
     glm::vec2 halfExtents {0.25F, 0.25F};
 };
 
 struct Segment
 {
-    static constexpr char const* kName = "Segment";
+    static constexpr char const* NAME = "Segment";
 
     float halfLength {1.0F};
     float thickness {0.05F};
@@ -45,14 +45,14 @@ struct Segment
 
 struct HalfPlane
 {
-    static constexpr char const* kName = "Half plane";
+    static constexpr char const* NAME = "Half plane";
 
     float drawExtent {8.0F};
 };
 
 struct Frame
 {
-    static constexpr char const* kName = "Frame";
+    static constexpr char const* NAME = "Frame";
 
     glm::vec2 halfExtents {4.0F, 3.0F}; // the opening, i.e. the usable world
     float thickness {0.2F};
@@ -61,7 +61,7 @@ struct Frame
 
 using Shape = std::variant<Circle, Box, Segment, HalfPlane, Frame>;
 
-inline constexpr std::size_t kShapeCount = std::variant_size_v<Shape>;
+inline constexpr std::size_t SHAPE_COUNT = std::variant_size_v<Shape>;
 
 namespace detail
 {
@@ -69,7 +69,7 @@ namespace detail
 template <std::size_t... I>
 [[nodiscard]] constexpr auto shapeNames(std::index_sequence<I...> /*alternatives*/)
 {
-    return std::array<char const*, sizeof...(I)> {std::variant_alternative_t<I, Shape>::kName...};
+    return std::array<char const*, sizeof...(I)> {std::variant_alternative_t<I, Shape>::NAME...};
 }
 
 // The fold visits every alternative and exactly one of them assigns, which is a `switch` over
@@ -85,15 +85,15 @@ template <std::size_t... I>
 
 } // namespace detail
 
-inline constexpr auto kShapeNames = detail::shapeNames(std::make_index_sequence<kShapeCount> {});
+inline constexpr auto SHAPE_NAMES = detail::shapeNames(std::make_index_sequence<SHAPE_COUNT> {});
 
-[[nodiscard]] inline char const* shapeName(Shape const& shape) noexcept { return kShapeNames[shape.index()]; }
+[[nodiscard]] inline char const* shapeName(Shape const& shape) noexcept { return SHAPE_NAMES[shape.index()]; }
 
 // A default-constructed alternative by its index in the variant, which is what the type combo
 // and the deserializer each have in hand. An index out of range gives the first alternative.
 [[nodiscard]] inline Shape defaultShape(std::size_t index) noexcept
 {
-    return detail::shapeOfIndex(index, std::make_index_sequence<kShapeCount> {});
+    return detail::shapeOfIndex(index, std::make_index_sequence<SHAPE_COUNT> {});
 }
 
 // `Shape` itself and nothing else, which every overload below that takes the variant is

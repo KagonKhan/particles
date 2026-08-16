@@ -19,8 +19,8 @@ class Scene;
 
 enum class RenderMode : std::uint8_t
 {
-    Points, // one GL_POINTS draw, the plain path
-    Splat,  // compute-accumulated density, the heavy path
+    POINTS, // one GL_POINTS draw, the plain path
+    SPLAT,  // compute-accumulated density, the heavy path
 };
 
 class Renderer
@@ -31,13 +31,13 @@ public:
 private:
     void renderSettings(float dt);
     void renderCameraPanel();
-    void dragEmitter(Scene& scene, glm::mat4 const& viewProj, int w, int h);
+    void dragEmitter(Scene& scene, glm::mat4 const& view_proj, int w, int h);
 
     // First, and deliberately: every pipeline below looks its program up in its constructor.
     DefaultShaders shaders_;
 
     Camera     camera_;
-    RenderMode mode_ {RenderMode::Points};
+    RenderMode mode_ {RenderMode::POINTS};
 
     // One upload per frame, shared by both pipelines: at MAX_PARTICLES the storage runs
     // to gigabytes, so a private copy per pipeline is not on the table.

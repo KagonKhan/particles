@@ -4,7 +4,7 @@
 #include <array>
 #include <cstddef>
 
-namespace Styling
+namespace styling
 {
 
 ImU32 messageColor(spdlog::level::level_enum level)
@@ -24,4 +24,4 @@ ImU32 messageColor(spdlog::level::level_enum level)
     return LEVEL_COLORS[std::min(index, LEVEL_COLORS.size() - 1)];
 }
 
-} // namespace Styling
+} // namespace styling

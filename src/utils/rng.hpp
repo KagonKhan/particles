@@ -5,12 +5,12 @@
 #include <cmath>
 #include <random>
 
-class RNG
+class Rng
 {
 public:
-    RNG()
+    Rng()
         : engine_(std::random_device{}()) {}
-    explicit RNG(std::uint32_t seed)
+    explicit Rng(std::uint32_t seed)
         : engine_(seed) {}
 
     // Uniform float in [min, max)

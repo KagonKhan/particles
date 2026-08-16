@@ -36,9 +36,9 @@ struct Topology
     // cannot see what there is to choose between".
     std::string virtualized;
 
-    [[nodiscard]] std::size_t particlesPerCache(std::size_t bytesPerParticle) const noexcept
+    [[nodiscard]] std::size_t particlesPerCache(std::size_t bytes_per_particle) const noexcept
     {
-        return (l1dBytes / bytesPerParticle);
+        return (l1dBytes / bytes_per_particle);
     }
 };
 

@@ -15,7 +15,7 @@
 
 // How far off the surface a resolved particle is left. Landing it exactly on the outline
 // lets rounding put it back inside, and it would spend every frame being pushed out again.
-constexpr float kContactSkin = 1e-4F;
+constexpr float CONTACT_SKIN = 1e-4F;
 
 
 struct Behavior
@@ -75,19 +75,19 @@ private:
 
             // Most of a pool is nowhere near any one body on any one frame, and this is what
             // those particles cost — no square root, no gradient, no contact built.
-            if (!mayContact(shape, local, kContactSkin)) {
+            if (!mayContact(shape, local, CONTACT_SKIN)) {
                 continue;
             }
 
             Contact const hit = contact(shape, local);
 
-            if (hit.distance >= kContactSkin) {
+            if (hit.distance >= CONTACT_SKIN) {
                 continue;
             }
 
             glm::vec2& velocity = chunk.velocities[i];
 
-            position += hit.normal * (kContactSkin - hit.distance);
+            position += hit.normal * (CONTACT_SKIN - hit.distance);
 
             float const approach = glm::dot(velocity, hit.normal);
 

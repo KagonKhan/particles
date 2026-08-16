@@ -78,11 +78,11 @@ int main()
     spdlog::set_level(spdlog::level::trace);
 
     // Before anything the console would want to show has had a chance to be logged.
-    auto logSink = std::make_shared<ImGuiConsoleSink>();
-    spdlog::default_logger()->sinks().push_back(logSink);
+    auto log_sink = std::make_shared<ImGuiConsoleSink>();
+    spdlog::default_logger()->sinks().push_back(log_sink);
 
     preferHardwareRenderer();
 
-    App app {"Template Project", std::move(logSink)};
+    App app {"Template Project", std::move(log_sink)};
     app.run();
 }

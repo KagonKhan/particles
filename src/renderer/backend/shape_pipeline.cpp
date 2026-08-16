@@ -23,9 +23,9 @@ namespace
 // one cannot silently renumber what the shader is being told.
 enum class GpuPrimitive : std::uint8_t
 {
-    Circle  = 0,
-    Box     = 1,
-    Segment = 2,
+    CIRCLE  = 0,
+    BOX     = 1,
+    SEGMENT = 2,
 };
 
 struct Drawn
@@ -49,18 +49,18 @@ struct Drawing
 
 [[nodiscard]] Drawing drawnAs(Circle shape) noexcept
 {
-    return {{Drawn {GpuPrimitive::Circle, {shape.radius, 0.0F}, {}, glm::vec2 {shape.radius}}}, 1};
+    return {{Drawn {GpuPrimitive::CIRCLE, {shape.radius, 0.0F}, {}, glm::vec2 {shape.radius}}}, 1};
 }
 
 [[nodiscard]] Drawing drawnAs(Box shape) noexcept
 {
-    return {{Drawn {GpuPrimitive::Box, shape.halfExtents, {}, shape.halfExtents}}, 1};
+    return {{Drawn {GpuPrimitive::BOX, shape.halfExtents, {}, shape.halfExtents}}, 1};
 }
 
 [[nodiscard]] Drawing drawnAs(Segment shape) noexcept
 {
     float const half = shape.thickness * 0.5F;
-    return {{Drawn {GpuPrimitive::Segment, {shape.halfLength, half}, {}, {shape.halfLength + half, half}}}, 1};
+    return {{Drawn {GpuPrimitive::SEGMENT, {shape.halfLength, half}, {}, {shape.halfLength + half, half}}}, 1};
 }
 
 // Unbounded in the field the simulation sees, so it is drawn as the finite slab hanging
@@ -68,7 +68,7 @@ struct Drawing
 [[nodiscard]] Drawing drawnAs(HalfPlane shape) noexcept
 {
     glm::vec2 const half {shape.drawExtent, shape.drawExtent * 0.5F};
-    return {{Drawn {GpuPrimitive::Box, half, {0.0F, -half.y}, half}}, 1};
+    return {{Drawn {GpuPrimitive::BOX, half, {0.0F, -half.y}, half}}, 1};
 }
 
 // Four walls rather than the one shelled box the distance field is: as a single body its
@@ -82,15 +82,15 @@ struct Drawing
     glm::vec2 const side {half, shape.halfExtents.y};
     glm::vec2 const cap {shape.halfExtents.x + shape.thickness, half};
 
-    float const sideX = shape.halfExtents.x + half;
-    float const capY  = shape.halfExtents.y + half;
+    float const side_x = shape.halfExtents.x + half;
+    float const cap_y  = shape.halfExtents.y + half;
 
     return {
         {
-            Drawn {GpuPrimitive::Box, side, {-sideX, 0.0F}, side},
-            Drawn {GpuPrimitive::Box, side, {sideX, 0.0F}, side},
-            Drawn {GpuPrimitive::Box, cap, {0.0F, -capY}, cap},
-            Drawn {GpuPrimitive::Box, cap, {0.0F, capY}, cap},
+            Drawn {GpuPrimitive::BOX, side, {-side_x, 0.0F}, side},
+            Drawn {GpuPrimitive::BOX, side, {side_x, 0.0F}, side},
+            Drawn {GpuPrimitive::BOX, cap, {0.0F, -cap_y}, cap},
+            Drawn {GpuPrimitive::BOX, cap, {0.0F, cap_y}, cap},
         },
         4
     };
@@ -120,14 +120,14 @@ ShapePipeline::ShapePipeline()
     glGenBuffers(1, &buffer_);
 
     // The quad's corners come out of gl_VertexID, so every attribute here is per-instance.
-    constexpr auto kStride = static_cast<GLsizei>(sizeof(GpuBody));
+    constexpr auto STRIDE = static_cast<GLsizei>(sizeof(GpuBody));
 
     glBindVertexArray(vao_);
     glBindBuffer(GL_ARRAY_BUFFER, buffer_);
 
     for (GLuint location = 0; location < 3; ++location) {
         glEnableVertexAttribArray(location);
-        glVertexAttribPointer(location, 4, GL_FLOAT, GL_FALSE, kStride, byteOffset(location * sizeof(glm::vec4)));
+        glVertexAttribPointer(location, 4, GL_FLOAT, GL_FALSE, STRIDE, byteOffset(location * sizeof(glm::vec4)));
         glVertexAttribDivisor(location, 1);
     }
 
@@ -201,9 +201,9 @@ void ShapePipeline::draw(std::span<SceneObject const* const> objects, RenderView
     glUniform1f(ambientLoc_, ambient_);
 
     // The sliders can be dragged to all zeros, which normalize would turn into NaNs.
-    float const     length   = glm::length(lightDir_);
-    glm::vec3 const lightDir = (length > 1e-4F)? lightDir_ / length : glm::vec3 {0.0F, 1.0F, 0.0F};
-    glUniform3fv(lightDirLoc_, 1, glm::value_ptr(lightDir));
+    float const     length    = glm::length(lightDir_);
+    glm::vec3 const light_dir = (length > 1e-4F)? lightDir_ / length : glm::vec3 {0.0F, 1.0F, 0.0F};
+    glUniform3fv(lightDirLoc_, 1, glm::value_ptr(light_dir));
 
     glBindVertexArray(vao_);
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, static_cast<GLsizei>(bodies_.size()));

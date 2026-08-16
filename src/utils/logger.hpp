@@ -16,37 +16,37 @@ class Logger
 {
 public:
     template <typename ... Args>
-    void TRACE(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    void trace(spdlog::format_string_t<Args...> fmt, Args&&... args) const
     {
         logger_->trace(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    void DEBUG(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    void debug(spdlog::format_string_t<Args...> fmt, Args&&... args) const
     {
         logger_->debug(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    void INFO(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    void info(spdlog::format_string_t<Args...> fmt, Args&&... args) const
     {
         logger_->info(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    void WARNING(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    void warning(spdlog::format_string_t<Args...> fmt, Args&&... args) const
     {
         logger_->warn(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    void ERROR(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    void error(spdlog::format_string_t<Args...> fmt, Args&&... args) const
     {
         logger_->error(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    void CRITICAL(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    void critical(spdlog::format_string_t<Args...> fmt, Args&&... args) const
     {
         logger_->critical(fmt, std::forward<Args>(args)...);
     }
@@ -54,9 +54,9 @@ public:
     Logger()
     {
         std::call_once(
-            init_flag,
+            initFlag_,
             [] {
-                auto name = std::string(type_name<Class>());
+                auto name = std::string(typeName<Class>());
                 logger_   = spdlog::get(name);
 
                 if (!logger_) {
@@ -68,7 +68,7 @@ public:
 
 private:
     inline static std::shared_ptr<spdlog::logger> logger_;
-    inline static std::once_flag                  init_flag;
+    inline static std::once_flag                  initFlag_;
 
     static spdlog::logger& defaultLogger()
     {
@@ -78,49 +78,49 @@ private:
 };
 
 
-class LOG
+class Log
 {
 public:
     template <typename ... Args>
-    static void TRACE(spdlog::format_string_t<Args...> fmt, Args&&... args)
+    static void trace(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_.TRACE(fmt, std::forward<Args>(args)...);
+        logger_.trace(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    static void DEBUG(spdlog::format_string_t<Args...> fmt, Args&&... args)
+    static void debug(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_.DEBUG(fmt, std::forward<Args>(args)...);
+        logger_.debug(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    static void INFO(spdlog::format_string_t<Args...> fmt, Args&&... args)
+    static void info(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_.INFO(fmt, std::forward<Args>(args)...);
+        logger_.info(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    static void WARNING(spdlog::format_string_t<Args...> fmt, Args&&... args)
+    static void warning(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_.WARNING(fmt, std::forward<Args>(args)...);
+        logger_.warning(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    static void ERROR(spdlog::format_string_t<Args...> fmt, Args&&... args)
+    static void error(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_.ERROR(fmt, std::forward<Args>(args)...);
+        logger_.error(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    static void CRITICAL(spdlog::format_string_t<Args...> fmt, Args&&... args)
+    static void critical(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_.CRITICAL(fmt, std::forward<Args>(args)...);
+        logger_.critical(fmt, std::forward<Args>(args)...);
     }
 
 private:
-    struct GLOBAL {};
+    struct Global {};
 
-    inline static Logger<GLOBAL> logger_;
+    inline static Logger<Global> logger_;
 };
 
 
@@ -137,34 +137,34 @@ protected:
             "Inherit privately: class MyClass : private TrackingLogger<MyClass>"
         );
         instances_.fetch_add(1, std::memory_order_relaxed);
-        this->TRACE("{} constructor [{}]", type_name<Derived>(), instances_.load(std::memory_order_relaxed));
+        this->trace("{} constructor [{}]", typeName<Derived>(), instances_.load(std::memory_order_relaxed));
     }
 
     ~TrackingLogger() noexcept
     {
         instances_.fetch_sub(1, std::memory_order_relaxed);
-        this->TRACE("{} destructor [{}]", type_name<Derived>(), instances_.load(std::memory_order_relaxed));
+        this->trace("{} destructor [{}]", typeName<Derived>(), instances_.load(std::memory_order_relaxed));
     }
 
     TrackingLogger(TrackingLogger const& other)
         : Logger<Derived>(other)
     {
         instances_.fetch_add(1, std::memory_order_relaxed);
-        this->TRACE("{} copy constructor [{}]", type_name<Derived>(), instances_.load(std::memory_order_relaxed));
+        this->trace("{} copy constructor [{}]", typeName<Derived>(), instances_.load(std::memory_order_relaxed));
     }
 
     TrackingLogger(TrackingLogger&& other) noexcept
         : Logger<Derived>(std::move(other))
     {
         instances_.fetch_add(1, std::memory_order_relaxed);
-        this->TRACE("{} move constructor [{}]", type_name<Derived>(), instances_.load(std::memory_order_relaxed));
+        this->trace("{} move constructor [{}]", typeName<Derived>(), instances_.load(std::memory_order_relaxed));
     }
 
     TrackingLogger& operator =(TrackingLogger const& other)
     {
         if (this != &other) {
             Logger<Derived>::operator =(other);
-            this->TRACE("{} copy assignment [{}]", type_name<Derived>(), instances_.load(std::memory_order_relaxed));
+            this->trace("{} copy assignment [{}]", typeName<Derived>(), instances_.load(std::memory_order_relaxed));
         }
 
         return *this;
@@ -174,7 +174,7 @@ protected:
     {
         if (this != &other) {
             Logger<Derived>::operator =(std::move(other));
-            this->TRACE("{} move assignment [{}]", type_name<Derived>(), instances_.load(std::memory_order_relaxed));
+            this->trace("{} move assignment [{}]", typeName<Derived>(), instances_.load(std::memory_order_relaxed));
         }
 
         return *this;

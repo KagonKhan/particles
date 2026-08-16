@@ -13,12 +13,12 @@
 namespace
 {
 
-constexpr float kMoveSpeed = 3.0F; // world units per second
-constexpr float kTurnSpeed = 1.5F; // radians per second
+constexpr float MOVE_SPEED = 3.0F; // world units per second
+constexpr float TURN_SPEED = 1.5F; // radians per second
 
-constexpr float kLookSensitivity = 0.0035F;                    // radians per pixel of mouse travel
-constexpr float kPitchLimit      = 1.55334F;                   // 89 degrees, just shy of vertical
-constexpr float kTwoPi           = 2.0F * std::numbers::pi_v<float>;
+constexpr float LOOK_SENSITIVITY = 0.0035F;                    // radians per pixel of mouse travel
+constexpr float PITCH_LIMIT      = 1.55334F;                   // 89 degrees, just shy of vertical
+constexpr float TWO_PI           = 2.0F * std::numbers::pi_v<float>;
 
 } // namespace
 
@@ -31,9 +31,9 @@ void Renderer::renderCameraPanel()
     ImGui::Begin("Camera");
 
     int  projection = static_cast<int>(camera_.projection);
-    bool switched   = ImGui::RadioButton("3D", &projection, static_cast<int>(Projection::Perspective));
+    bool switched   = ImGui::RadioButton("3D", &projection, static_cast<int>(Projection::PERSPECTIVE));
     ImGui::SameLine();
-    switched = ImGui::RadioButton("2D", &projection, static_cast<int>(Projection::Orthographic)) || switched;
+    switched = ImGui::RadioButton("2D", &projection, static_cast<int>(Projection::ORTHOGRAPHIC)) || switched;
     ImGui::SetItemTooltip("Orthographic: same cloud, no perspective foreshortening");
 
     if (switched) {
@@ -46,16 +46,16 @@ void Renderer::renderCameraPanel()
     // could be anywhere by then. Top stops at 89 degrees, the same place the pitch slider
     // does, because a camera looking straight down the world up axis makes lookAt
     // degenerate.
-    auto snapView = [this] (float degreesYaw, float degreesPitch) {
-            camera_.yaw      = glm::radians(degreesYaw);
-            camera_.pitch    = glm::radians(degreesPitch);
+    auto snap_view = [this] (float degrees_yaw, float degrees_pitch) {
+            camera_.yaw      = glm::radians(degrees_yaw);
+            camera_.pitch    = glm::radians(degrees_pitch);
             camera_.position = -camera_.forward() * camera_.focusDistance;
         };
 
     if (ImGui::Button("Top")) {
         // Same yaw as Front, so pitching back up from here returns to Front rather than to
         // the mirrored view behind the plane.
-        snapView(180.0F, -89.0F);
+        snap_view(180.0F, -89.0F);
     }
 
     ImGui::SetItemTooltip("Edge-on to the simulation plane, so the cloud collapses to a line");
@@ -63,16 +63,16 @@ void Renderer::renderCameraPanel()
     ImGui::SameLine();
     if (ImGui::Button("Front")) {
         // 180, not 0: both look square on at the plane, but from -z it is mirrored, so
-        // only this one puts world +x on the right. snapView derives the position from
+        // only this one puts world +x on the right. snap_view derives the position from
         // the facing, so this also lands the camera on the correct side.
-        snapView(180.0F, 0.0F);
+        snap_view(180.0F, 0.0F);
     }
 
     ImGui::SetItemTooltip("Square on to the simulation plane, +x right — the view the simulation is written for");
 
     ImGui::SameLine();
     if (ImGui::Button("Side")) {
-        snapView(90.0F, 0.0F);
+        snap_view(90.0F, 0.0F);
     }
 
     ImGui::SetItemTooltip("Edge-on to the simulation plane, so the cloud collapses to a line");
@@ -100,10 +100,10 @@ void Renderer::renderSettings(float dt)
         ImGui::SeparatorText("Mode");
 
         int mode = static_cast<int>(mode_);
-        ImGui::RadioButton("Points", &mode, static_cast<int>(RenderMode::Points));
+        ImGui::RadioButton("Points", &mode, static_cast<int>(RenderMode::POINTS));
         ImGui::SetItemTooltip("One GL_POINTS draw. Simple, and what to use while working on the simulation.");
         ImGui::SameLine();
-        ImGui::RadioButton("Splat", &mode, static_cast<int>(RenderMode::Splat));
+        ImGui::RadioButton("Splat", &mode, static_cast<int>(RenderMode::SPLAT));
         ImGui::SetItemTooltip("Compute-accumulated density. Survives counts the point rasterizer will not.");
         mode_ = static_cast<RenderMode>(mode);
 
@@ -123,8 +123,8 @@ void Renderer::renderSettings(float dt)
     // which is what makes it fly rather than slide along the world grid.
     if (!io.WantCaptureKeyboard) {
         float sprint = ImGui::IsKeyDown(ImGuiMod_Shift)? 4.0F : 1.0F;
-        float move   = kMoveSpeed * sprint * dt;
-        float turn   = kTurnSpeed * dt;
+        float move   = MOVE_SPEED * sprint * dt;
+        float turn   = TURN_SPEED * dt;
 
         glm::vec3 forward = camera_.forward();
         glm::vec3 right   = camera_.right();
@@ -162,20 +162,20 @@ void Renderer::renderSettings(float dt)
 
         // Not scaled by dt: a mouse reports how far it moved, not how fast, so scaling it
         // by frame time would make the same flick turn further on a slow frame.
-        camera_.yaw   -= io.MouseDelta.x * kLookSensitivity;
-        camera_.pitch -= io.MouseDelta.y * kLookSensitivity;
+        camera_.yaw   -= io.MouseDelta.x * LOOK_SENSITIVITY;
+        camera_.pitch -= io.MouseDelta.y * LOOK_SENSITIVITY;
 
         // Stops short of vertical for the same reason the pitch slider does: straight down
         // the world up axis makes lookAt degenerate.
-        camera_.pitch = std::clamp(camera_.pitch, -kPitchLimit, kPitchLimit);
+        camera_.pitch = std::clamp(camera_.pitch, -PITCH_LIMIT, PITCH_LIMIT);
     }
 
     // Wrap once, after every source has had its say, so the slider stays in range however
     // far the camera has been spun. remainder lands in [-pi, pi]; fmod would not.
-    camera_.yaw = std::remainder(camera_.yaw, kTwoPi);
+    camera_.yaw = std::remainder(camera_.yaw, TWO_PI);
 }
 
-void Renderer::dragEmitter(Scene& scene, glm::mat4 const& viewProj, int w, int h)
+void Renderer::dragEmitter(Scene& scene, glm::mat4 const& view_proj, int w, int h)
 {
     ImGuiIO& io = ImGui::GetIO();
     if (io.WantCaptureMouse || !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
@@ -193,14 +193,14 @@ void Renderer::dragEmitter(Scene& scene, glm::mat4 const& viewProj, int w, int h
     // Cast a ray through the cursor and land it on the simulation plane. Now that the
     // world is flat there is a single unambiguous answer to "what is under the cursor",
     // which is what makes dragging the emitter around by hand possible at all.
-    glm::mat4 invViewProj = glm::inverse(viewProj);
-    glm::vec4 nearPoint   = invViewProj * glm::vec4(ndc_x, ndc_y, -1.0F, 1.0F);
-    glm::vec4 farPoint    = invViewProj * glm::vec4(ndc_x, ndc_y, 1.0F, 1.0F);
-    nearPoint /= nearPoint.w;
-    farPoint  /= farPoint.w;
+    glm::mat4 inv_view_proj = glm::inverse(view_proj);
+    glm::vec4 near_point    = inv_view_proj * glm::vec4(ndc_x, ndc_y, -1.0F, 1.0F);
+    glm::vec4 far_point     = inv_view_proj * glm::vec4(ndc_x, ndc_y, 1.0F, 1.0F);
+    near_point /= near_point.w;
+    far_point  /= far_point.w;
 
-    glm::vec3 origin = glm::vec3(nearPoint);
-    glm::vec3 ray    = glm::vec3(farPoint) - origin;
+    glm::vec3 origin = glm::vec3(near_point);
+    glm::vec3 ray    = glm::vec3(far_point) - origin;
 
     // A camera looking along the plane rather than at it sees no point under the cursor at
     // all — the ray runs parallel and never crosses z = 0. Snap to Front to get it back.
@@ -223,7 +223,7 @@ void Renderer::render(FramebufferSize size, Scene& scene, float dt)
 
     // Only the active pipeline's settings, so the inactive one's knobs are not sitting
     // there looking like they do something.
-    if (mode_ == RenderMode::Points) {
+    if (mode_ == RenderMode::POINTS) {
         points_.renderSettings();
     }
     else {
@@ -248,7 +248,7 @@ void Renderer::render(FramebufferSize size, Scene& scene, float dt)
     // One upload, whichever pipeline consumes it, then one fence covering its draw.
     particles_.upload(scene.positions());
 
-    if (mode_ == RenderMode::Points) {
+    if (mode_ == RenderMode::POINTS) {
         points_.draw(particles_, view);
     }
     else {

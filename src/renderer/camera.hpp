@@ -8,15 +8,15 @@
 #include <numbers>
 enum class Projection : std::uint8_t
 {
-    Perspective,  // 3D
-    Orthographic, // 2D
+    PERSPECTIVE,  // 3D
+    ORTHOGRAPHIC, // 2D
 };
 
 // A free camera: it has a position in the world and a direction it faces, and neither is
 // tied to anything in the scene. Movement keys push the position around; nothing orbits.
 struct Camera
 {
-    Projection projection {Projection::Perspective};
+    Projection projection {Projection::PERSPECTIVE};
 
     glm::vec3 position {0.0F, 0.0F, 4.0F};
 

@@ -16,11 +16,11 @@
 namespace
 {
 
-std::filesystem::path const kOutputDir {"measurements"};
+std::filesystem::path const OUTPUT_DIR {"measurements"};
 
 // One row per run, appended, so a session's configurations end up side by side in the order
 // they were tried. The per-run sample files sit next to it for anything the summary flattens.
-std::filesystem::path const kSummaryFile = kOutputDir / "summary.csv";
+std::filesystem::path const SUMMARY_FILE = OUTPUT_DIR / "summary.csv";
 
 std::string timestamp()
 {
@@ -67,27 +67,27 @@ void Bench::start(std::string label, RunConfig config)
     micros_.reserve(static_cast<std::size_t>(sampleSteps_));
     alive_.reserve(static_cast<std::size_t>(sampleSteps_));
 
-    state_ = (warmupSteps_ > 0)? State::Warmup : State::Collecting;
+    state_ = (warmupSteps_ > 0)? State::WARMUP : State::COLLECTING;
 }
 
 void Bench::cancel()
 {
-    state_ = State::Idle;
+    state_ = State::IDLE;
 }
 
 void Bench::sample(double micros, std::size_t alive)
 {
     switch (state_) {
-    case State::Idle:
+    case State::IDLE:
         return;
 
-    case State::Warmup:
+    case State::WARMUP:
         if (++warmupSeen_ >= warmupSteps_) {
-            state_ = State::Collecting;
+            state_ = State::COLLECTING;
         }
         return;
 
-    case State::Collecting:
+    case State::COLLECTING:
         micros_.push_back(micros);
         alive_.push_back(alive);
 
@@ -100,7 +100,7 @@ void Bench::sample(double micros, std::size_t alive)
 
 void Bench::finish()
 {
-    state_ = State::Idle;
+    state_ = State::IDLE;
 
     if (micros_.empty()) {
         return;
@@ -132,14 +132,14 @@ void Bench::finish()
     result.minMicros    = sorted.front();
     result.maxMicros    = sorted.back();
 
-    auto const [minAlive, maxAlive] = std::minmax_element(alive_.begin(), alive_.end());
-    result.minAlive                 = *minAlive;
-    result.maxAlive                 = *maxAlive;
+    auto const [min_alive, max_alive] = std::minmax_element(alive_.begin(), alive_.end());
+    result.minAlive                   = *min_alive;
+    result.maxAlive                   = *max_alive;
 
     std::error_code error;
-    std::filesystem::create_directories(kOutputDir, error);
+    std::filesystem::create_directories(OUTPUT_DIR, error);
 
-    std::filesystem::path const samplesPath = kOutputDir / std::format(
+    std::filesystem::path const samples_path = OUTPUT_DIR / std::format(
         "{}_{}_chunk{}_{}_{}.csv",
         timestamp(),
         sanitize(result.label),
@@ -148,7 +148,7 @@ void Bench::finish()
         config_.pinned? "pinned" : "free");
 
     {
-        std::ofstream samples {samplesPath};
+        std::ofstream samples {samples_path};
         samples << "step,alive,fused_us\n";
 
         for (std::size_t i = 0; i < micros_.size(); ++i) {
@@ -156,11 +156,11 @@ void Bench::finish()
         }
     }
 
-    bool const summaryIsNew = !std::filesystem::exists(kSummaryFile, error);
+    bool const summary_is_new = !std::filesystem::exists(SUMMARY_FILE, error);
 
-    std::ofstream summary {kSummaryFile, std::ios::app};
+    std::ofstream summary {SUMMARY_FILE, std::ios::app};
 
-    if (summaryIsNew) {
+    if (summary_is_new) {
         summary << "timestamp,label,chunk,parallel,pinned,threads,samples,"
                    "mean_us,median_us,p95_us,min_us,max_us,stddev_us,min_alive,max_alive\n";
     }
@@ -183,7 +183,7 @@ void Bench::finish()
         result.minAlive,
         result.maxAlive);
 
-    result.path = std::filesystem::absolute(samplesPath, error).string();
+    result.path = std::filesystem::absolute(samples_path, error).string();
 
     spdlog::info(
         "Bench '{}': {:.1f} us mean over {} steps -> {}",
@@ -207,17 +207,17 @@ void Bench::render(RunConfig const& current)
 
     ImGui::SliderInt("Sample steps", &sampleSteps_, 10, 5000);
 
-    if (state_ == State::Idle) {
+    if (state_ == State::IDLE) {
         if (ImGui::Button("Record run")) {
             start(label.data(), current);
         }
     }
     else {
-        float const progress = (state_ == State::Warmup)
+        float const progress = (state_ == State::WARMUP)
             ? static_cast<float>(warmupSeen_) / static_cast<float>(std::max(warmupSteps_, 1))
             : static_cast<float>(micros_.size()) / static_cast<float>(std::max(sampleSteps_, 1));
 
-        ImGui::ProgressBar(progress, ImVec2 {-1.0F, 0.0F}, (state_ == State::Warmup)? "warming up" : "recording");
+        ImGui::ProgressBar(progress, ImVec2 {-1.0F, 0.0F}, (state_ == State::WARMUP)? "warming up" : "recording");
 
         if (ImGui::Button("Cancel")) {
             cancel();

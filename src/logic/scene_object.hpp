@@ -89,7 +89,7 @@ inline bool renderShapeFields(Frame& shape)
 inline bool renderShapeSettings(Shape& shape)
 {
     int  type    = static_cast<int>(shape.index());
-    bool changed = ImGui::Combo("Type", &type, kShapeNames.data(), static_cast<int>(kShapeNames.size()));
+    bool changed = ImGui::Combo("Type", &type, SHAPE_NAMES.data(), static_cast<int>(SHAPE_NAMES.size()));
 
     if (changed) {
         shape = defaultShape(static_cast<std::size_t>(type));
@@ -227,8 +227,8 @@ inline void deserialize(Shape& shape, nlohmann::json const& in)
     if (auto const entry = in.find("type"); (entry != in.end()) && entry->is_string()) {
         std::string const name = entry->get<std::string>();
 
-        for (std::size_t i = 0; i < kShapeNames.size(); ++i) {
-            if (name == kShapeNames[i]) {
+        for (std::size_t i = 0; i < SHAPE_NAMES.size(); ++i) {
+            if (name == SHAPE_NAMES[i]) {
                 shape = defaultShape(i);
                 break;
             }

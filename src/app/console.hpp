@@ -21,30 +21,24 @@
 class OutputConsole : public Immovable<OutputConsole>
 {
 private:
-    static constexpr float FIELD_WIDTH {100.0f};
-
-    static constexpr char const* const OPTIONS_POPUP {"console options"};
-
-    // In spdlog::level::level_enum order, so a selected index is the level it filters on.
     static constexpr std::array<char const*, 6> LEVEL_NAMES {
         "trace", "debug", "info", "warning", "error", "critical",
     };
 
 public:
-    explicit OutputConsole(std::shared_ptr<ImGuiConsoleSink> logSink);
+    explicit OutputConsole(std::shared_ptr<ImGuiConsoleSink> log_sink)
+        : sink_{std::move(log_sink)}
+    {}
+
 
     void update();
     void render();
 
 private:
-    // Only the drawing is optional: messages keep arriving and ageing out while the panel
-    // is hidden, so turning it back on shows the log as it stands rather than as it was.
-    Knob<bool>& panelVisible {Settings::getInstance().option<bool>("View", "Console", true)};
+    std::shared_ptr<ImGuiConsoleSink> sink_;
 
-    std::shared_ptr<ImGuiConsoleSink> sink;
-
-    LogBuffer   log;
-    std::string scratch;
+    LogBuffer   log_;
+    std::string scratch_;
 
     // Wrapped rows have no height in common, which is the one thing ImGuiListClipper needs.
     // These are the running vertical offsets of every row, measured once per row and reused
@@ -56,20 +50,25 @@ private:
         int decoration {-1};
         std::uint64_t firstRow {0};
         std::uint64_t generation {0};
+    } wrapped_;
+
+
+    Knob<bool>& panelVisible_ {Settings::getInstance().option<bool>(
+                                   "View",
+                                   "Console",
+                                   true,
+                                   "The log panel. Messages keep arriving while it is hidden.")
     };
-
-    RowOffsets wrapped;
-
-    Knob<char const*> levelFilter {"Filter messages", LEVEL_NAMES, spdlog::level::trace};
-
-    Knob<bool> showTimestamps {"Timestamps", false};
-    Knob<bool> showLevels {"Levels", false};
-    Knob<bool> wrapText {"Wrap", false};
-    Knob<bool> autoScroll {"Auto-scroll", true};
-    Knob<int>  maxMessages {"Max messages", 8192, 64, 1'000'000, "%d",
+    Knob<int> maxMessages_ {"Max messages", 8192, 64, 1'000'000, "%d",
                             "Oldest messages are dropped once the history exceeds this.",
                             ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic
     };
+    Knob<char const*> levelFilter_ {"Filter messages", LEVEL_NAMES, spdlog::level::trace};
+    Knob<bool>        showTimestamps_ {"Timestamps", false};
+    Knob<bool>        showLevels_ {"Levels", false};
+    Knob<bool>        wrapText_ {"Wrap", false};
+    Knob<bool>        autoScroll_ {"Auto-scroll", true};
+
 
     void applySettings();
 

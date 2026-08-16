@@ -13,14 +13,14 @@ static constexpr std::size_t MAX_PARTICLES = 2'000'000;
 
 // A particle's position and velocity together, and so what a chunk of them costs in cache.
 // Ages are not in a chunk: nothing acting on particles reads them.
-static constexpr std::size_t kChunkBytesPerParticle = 2 * sizeof(glm::vec2);
+static constexpr std::size_t CHUNK_BYTES_PER_PARTICLE = 2 * sizeof(glm::vec2);
 
 // How much of the pool is handed to the scene's objects at a time, where nothing better is
 // known. A chunk stays in L1 for however many objects have something to say about it, which
 // is the point of slicing the pool at all — the pool whole is tens of megabytes and would be
 // evicted between every pair of them. Half of a 32 KiB L1d, leaving the other half for
 // everything the objects themselves touch.
-static constexpr std::size_t kChunkParticles = 1024;
+static constexpr std::size_t CHUNK_PARTICLES = 1024;
 
 
 // The simulation is flat: a particle has a position and a velocity in the plane, and

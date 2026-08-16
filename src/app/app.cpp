@@ -11,13 +11,13 @@
 #include <utility>
 
 
-App::App(std::string const& title, std::shared_ptr<ImGuiConsoleSink> logSink)
+App::App(std::string const& title, std::shared_ptr<ImGuiConsoleSink> log_sink)
     : window_{2560, 1440, title},
-      console{std::move(logSink)}
+      console_{std::move(log_sink)}
 {
-    Settings& settings_ {Settings::getInstance()};
-    settings_.option<bool>("View", "Performance", true);
-    settings_.describe("View", "Performance", "The frame and simulation timings panel");
+    Settings& settings {Settings::getInstance()};
+    settings.option<bool>("View", "Performance", true);
+    settings.describe("View", "Performance", "The frame and simulation timings panel");
 }
 
 void App::run()
@@ -25,17 +25,17 @@ void App::run()
     while (!window_.shouldClose()) {
         window_.pollEvents();
 
-        const float dt = clock.sample();
+        const float dt = clock_.sample();
 
         auto const start_time = Time::measure();
 
         auto const begin_frame_time     = Time::execution(&App::beginFrame, this);
-        auto const console_update_time  = Time::execution(&OutputConsole::update, console);
+        auto const console_update_time  = Time::execution(&OutputConsole::update, console_);
         auto const step_simulation_time = Time::execution(&App::stepSimulation, this, dt);
         auto const render_settings_time = Time::execution(&Scene::renderSettings, scene_);
         auto const render_stats_time    = Time::execution(&App::renderStats, this);
         auto const render_time          = Time::execution(&Renderer::render, renderer_, window_.size(), *scene_, dt);
-        auto const console_render_time  = Time::execution(&OutputConsole::render, console);
+        auto const console_render_time  = Time::execution(&OutputConsole::render, console_);
         auto const finish_frame_time    = Time::execution(&Window::endFrame, window_);
 
         auto const end_time = Time::measure();
@@ -85,8 +85,8 @@ void App::renderStats()
 
     ImGui::Begin("Performance");
 
-    ImGui::Text("FPS: %.1f", 1.0F / clock.get());
-    ImGui::Text("Frame: %.3f ms", clock.get() * 1000.0F);
+    ImGui::Text("FPS: %.1f", 1.0F / clock_.get());
+    ImGui::Text("Frame: %.3f ms", clock_.get() * 1000.0F);
 
     ImGui::SeparatorText("Simulation");
 

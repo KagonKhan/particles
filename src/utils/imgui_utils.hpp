@@ -6,7 +6,7 @@
 
 #include <imgui.h>
 
-namespace ImGuiUtils
+namespace imgui_utils
 {
 
 // A toolbar whose items stay on one line while they fit and wrap onto the next when they do
@@ -17,7 +17,7 @@ namespace ImGuiUtils
 class FlowLayout
 {
 public:
-    explicit FlowLayout(float itemWidth) noexcept;
+    explicit FlowLayout(float item_width) noexcept;
 
     [[nodiscard]] bool button(char const* label);
 
@@ -25,13 +25,13 @@ public:
     void field(KnobBase& knob);
 
 private:
-    void sameLineIfFits(float nextWidth);
+    void sameLineIfFits(float next_width);
 
     float itemWidth_;
     float rightEdge_;
     bool  started_ {false};
 };
 
-} // namespace ImGuiUtils
+} // namespace imgui_utils
 
 #endif // YARR_UTILS_IMGUI_UTILS_HPP

@@ -50,7 +50,7 @@ private:
     };
 
     double spawnAccumulator_ {};
-    RNG    rng_;
+    Rng    rng_;
 };
 
 #endif // YARR_EMITTER_HPP

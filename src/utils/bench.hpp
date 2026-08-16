@@ -51,21 +51,21 @@ public:
     // it has the samples it was asked for.
     void sample(double micros, std::size_t alive);
 
-    [[nodiscard]] bool recording() const noexcept { return state_ != State::Idle; }
+    [[nodiscard]] bool recording() const noexcept { return state_ != State::IDLE; }
 
     void render(RunConfig const& current);
 
 private:
     enum class State
     {
-        Idle,
-        Warmup,
-        Collecting,
+        IDLE,
+        WARMUP,
+        COLLECTING,
     };
 
     void finish();
 
-    State     state_ {State::Idle};
+    State     state_ {State::IDLE};
     RunConfig config_;
     std::string label_ {"run"};
 

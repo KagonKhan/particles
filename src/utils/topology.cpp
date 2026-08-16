@@ -17,7 +17,7 @@
 namespace
 {
 
-std::filesystem::path const kCpuRoot {"/sys/devices/system/cpu"};
+std::filesystem::path const CPU_ROOT {"/sys/devices/system/cpu"};
 
 std::string readTrimmed(std::filesystem::path const& path)
 {
@@ -58,7 +58,7 @@ std::size_t parseCacheSize(std::string const& text)
 // consistently across machines, so they are matched on what they say they are.
 std::size_t cacheSize(int cpu, int level, std::string_view type)
 {
-    std::filesystem::path const root = kCpuRoot / ("cpu" + std::to_string(cpu)) / "cache";
+    std::filesystem::path const root = CPU_ROOT / ("cpu" + std::to_string(cpu)) / "cache";
     std::error_code             error;
 
     if (!std::filesystem::exists(root, error)) {
@@ -114,22 +114,22 @@ Topology build()
 
     // Grouped by size rather than by die: a die is not what matters here, the cache it
     // carries is, and the kernel will name the sharing set for us.
-    std::map<std::size_t, std::vector<int>> byLastLevel;
+    std::map<std::size_t, std::vector<int>> by_last_level;
 
     for (int cpu = 0; cpu < result.onlineCpus; ++cpu) {
         std::size_t const size = cacheSize(cpu, 3, "Unified");
 
         if (size > 0) {
-            byLastLevel[size].push_back(cpu);
+            by_last_level[size].push_back(cpu);
         }
     }
 
-    if (!byLastLevel.empty()) {
-        auto const& largest = *byLastLevel.rbegin();
+    if (!by_last_level.empty()) {
+        auto const& largest = *by_last_level.rbegin();
 
         result.largestCacheBytes = largest.first;
         result.largestCacheCpus  = largest.second;
-        result.uniformCache      = (byLastLevel.size() == 1);
+        result.uniformCache      = (by_last_level.size() == 1);
     }
 
     result.virtualized = detectVirtualization();

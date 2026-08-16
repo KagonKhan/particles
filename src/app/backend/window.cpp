@@ -11,7 +11,7 @@
 namespace
 {
 
-void glfw_error_callback(int error, const char* description)
+void glfwErrorCallback(int error, const char* description)
 {
     spdlog::error("Glfw Error {}: {}\n", error, description);
 }
@@ -21,7 +21,7 @@ void glfw_error_callback(int error, const char* description)
 
 GlfwLibrary::GlfwLibrary()
 {
-    glfwSetErrorCallback(glfw_error_callback);
+    glfwSetErrorCallback(glfwErrorCallback);
     if (glfwInit() == 0) {
         throw InitializationError("glfwInit failed!");
     }
