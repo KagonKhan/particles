@@ -1,6 +1,7 @@
 #ifndef YARR_APP_WINDOW_HPP
 #define YARR_APP_WINDOW_HPP
 
+#include "renderer/render_view.hpp"
 #include "utils/bases.hpp"
 #include "utils/opengl.hpp"
 
@@ -29,13 +30,6 @@ struct GlfwLibrary : public Immovable<GlfwLibrary>
 {
     GlfwLibrary();
     ~GlfwLibrary();
-};
-
-
-struct FramebufferSize
-{
-    int width  = 0;
-    int height = 0;
 };
 
 

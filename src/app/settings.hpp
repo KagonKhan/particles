@@ -1,7 +1,7 @@
 #ifndef YARR_APP_SETTINGS_HPP
 #define YARR_APP_SETTINGS_HPP
 
-#include "app/exceptions.hpp"
+#include "exceptions.hpp"
 #include "logic/knob.hpp"
 #include "utils/bases.hpp"
 
@@ -26,7 +26,7 @@ public:
     // a later caller passing the same ones gets the knob that is already there. The
     // reference stays good for the rest of the run — the knobs are heap nodes, so nothing
     // registered afterwards moves them.
-    template <typename T, typename... Args>
+    template <typename T, typename ... Args>
     Knob<T>& option(char const* menu, char const* name, Args&&... args)
     {
         if (Entry* const existing = findEntry(menu, name)) {
@@ -68,12 +68,12 @@ private:
     struct Entry
     {
         std::unique_ptr<KnobBase> knob;
-        char const*               tooltip;
+        char const* tooltip;
     };
 
     struct Menu
     {
-        char const*        name;
+        char const* name;
         std::vector<Entry> entries;
     };
 

@@ -1,9 +1,9 @@
 #ifndef YARR_SCENE_HPP
 #define YARR_SCENE_HPP
 
-#include "emitter/emitter.hpp"
 #include "logic/objects/attractor.hpp"
 #include "logic/objects/boundary.hpp"
+#include "logic/objects/emitter.hpp"
 #include "logic/particle_pool.hpp"
 #include "utils/bench.hpp"
 

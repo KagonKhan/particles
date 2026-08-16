@@ -5,6 +5,15 @@
 #include <glm/ext/vector_float3.hpp>
 #include <glm/ext/vector_float4.hpp>
 
+// The target's pixel dimensions. Here rather than beside the window that measures it, so
+// the renderer can take one without also taking GLFW.
+struct FramebufferSize
+{
+    int width  = 0;
+    int height = 0;
+};
+
+
 // Everything a draw pipeline needs from whatever is looking at the scene. Pipelines stay
 // ignorant of the camera itself, the same way the emitter stays ignorant of it — the
 // caller owns the projection and hands over only its results.

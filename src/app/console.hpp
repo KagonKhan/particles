@@ -3,7 +3,7 @@
 
 
 #include "app/settings.hpp"
-#include "logic/console_sink.hpp"
+#include "utils/console_sink.hpp"
 #include <imgui.h>
 #include <cstddef>
 #include <memory>

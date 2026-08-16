@@ -37,34 +37,36 @@ add_executable(${PROJECT}
 
     src/app/app.cpp
     src/app/console.cpp
-    src/app/imgui_layer.cpp
     src/app/settings.cpp
-    src/app/window.cpp
+    src/app/backend/imgui_layer.cpp
+    src/app/backend/window.cpp
 
-    src/emitter/emitter.cpp
+    src/logic/scene.cpp
+    src/logic/objects/emitter.cpp
 
-    src/renderer/image.cpp
+    src/renderer/camera.cpp
     src/renderer/renderer.cpp
-    src/renderer/particle_buffer.cpp
-    src/renderer/point_pipeline.cpp
-    src/renderer/splat_pipeline.cpp
-    src/renderer/shape_pipeline.cpp
+    src/renderer/backend/particle_buffer.cpp
+    src/renderer/backend/point_pipeline.cpp
+    src/renderer/backend/shape_pipeline.cpp
+    src/renderer/backend/splat_pipeline.cpp
 
-    src/utils/logger.cpp
-    src/utils/shader_cache.cpp
-    src/utils/rng.cpp
-    src/utils/topology.cpp
     src/utils/bench.cpp
-    src/app/scene.cpp
-    src/logic/camera.cpp
-    src/logic/objects/attractor.hpp
-    src/logic/objects/boundary.hpp
+    src/utils/logger.cpp
+    src/utils/rng.cpp
+    src/utils/shader_cache.cpp
+    src/utils/topology.cpp
+
+    # Header-only, listed so IDEs and the sdf.inl dependency show up in the target.
     src/logic/behavior/behavior.hpp
     src/logic/knob.hpp
+    src/logic/objects/attractor.hpp
+    src/logic/objects/boundary.hpp
+    src/logic/objects/emitter.hpp
     src/logic/particle_pool.hpp
-    src/logic/shape.hpp
     src/logic/scene_object.hpp
     src/logic/sdf.hpp
+    src/logic/shape.hpp
     resources/shaders/sdf.inl
 )
 

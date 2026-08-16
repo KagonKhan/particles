@@ -1,7 +1,7 @@
 #ifndef PROJECT_UTILS_UTIL_HPP
 #define PROJECT_UTILS_UTIL_HPP
 
-#include "app/exceptions.hpp"
+#include "exceptions.hpp"
 
 #include <chrono>
 #include <filesystem>

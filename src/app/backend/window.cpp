@@ -1,6 +1,6 @@
 #include "window.hpp"
 
-#include "app/exceptions.hpp"
+#include "exceptions.hpp"
 #include "utils/opengl.hpp"
 
 #include <spdlog/spdlog.h>
@@ -30,7 +30,6 @@ GlfwLibrary::~GlfwLibrary()
 {
     glfwTerminate();
 }
-
 
 Window::Window(int width, int height, std::string const& title)
 {

@@ -56,9 +56,15 @@ void App::stepSimulation(float dt)
     float const step = 1.0F / static_cast<float>(simulationRate_.get());
     physicsUpdateAccumulator_ += dt;
 
-    while (physicsUpdateAccumulator_ > 0.0F) {
+    std::size_t updateStep {0};
+    while (physicsUpdateAccumulator_ > 0.0F && updateStep < simulationStepLimit_.get()) {
         scene_->update(step);
         physicsUpdateAccumulator_ -= step;
+        ++updateStep;
+    }
+
+    if (updateStep >= simulationStepLimit_.get()) {
+        physicsUpdateAccumulator_ = 0.0F;
     }
 }
 
@@ -76,8 +82,12 @@ void App::renderStats()
     ImGui::SeparatorText("Simulation");
 
     simulationRate_.render();
+    simulationStepLimit_.render();
     ImGui::SetItemTooltip("How often the simulation steps, independent of the frame rate");
-    ImGui::Text("Step: %.3f ms", 1000.0F / (float)simulationRate_.get());
+    if (simulationRate_.get() > 0) {
+        ImGui::Text("Step: %.3f ms", 1000.0F / static_cast<float>(simulationRate_.get()));
+    }
+
     ImGui::End();
 }
 

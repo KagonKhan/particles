@@ -1,7 +1,7 @@
 #ifndef YARR_SPLAT_PIPELINE_HPP
 #define YARR_SPLAT_PIPELINE_HPP
 
-#include "renderer/particle_buffer.hpp"
+#include "renderer/backend/particle_buffer.hpp"
 #include "renderer/render_view.hpp"
 
 #include <GL/glew.h>

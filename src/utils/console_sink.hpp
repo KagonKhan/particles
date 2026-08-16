@@ -1,5 +1,5 @@
-#ifndef YARR_LOGIC_CONSOLE_SINK_HPP
-#define YARR_LOGIC_CONSOLE_SINK_HPP
+#ifndef YARR_UTILS_CONSOLE_SINK_HPP
+#define YARR_UTILS_CONSOLE_SINK_HPP
 
 #include <spdlog/sinks/base_sink.h>
 
@@ -51,4 +51,4 @@ private:
     std::vector<ConsoleMessage> pending_;
 };
 
-#endif // YARR_LOGIC_CONSOLE_SINK_HPP
+#endif // YARR_UTILS_CONSOLE_SINK_HPP

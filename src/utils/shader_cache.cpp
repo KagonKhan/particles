@@ -1,6 +1,6 @@
 #include "shader_cache.hpp"
 
-#include "app/exceptions.hpp"
+#include "exceptions.hpp"
 #include "utils/utils.hpp"
 
 #include <spdlog/common.h>

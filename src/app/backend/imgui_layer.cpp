@@ -1,6 +1,6 @@
 #include "imgui_layer.hpp"
 
-#include "app/window.hpp"
+#include "app/backend/window.hpp"
 #include "utils/opengl.hpp"
 
 namespace
@@ -16,7 +16,7 @@ ImGuiLayer::ImGuiLayer(Window& window)
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
 
-    ImGuiIO& io     = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;                   // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;                    // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;                       // Enable Docking

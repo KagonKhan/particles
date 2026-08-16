@@ -1,6 +1,6 @@
 #include "renderer.hpp"
 
-#include "app/scene.hpp"
+#include "logic/scene.hpp"
 
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>

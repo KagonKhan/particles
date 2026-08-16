@@ -2,13 +2,12 @@
 #define YARR_RENDERER_HPP
 
 #include "app/settings.hpp"
-#include "app/window.hpp"
-#include "logic/camera.hpp"
-#include "renderer/particle_buffer.hpp"
-#include "renderer/point_pipeline.hpp"
+#include "renderer/backend/particle_buffer.hpp"
+#include "renderer/backend/point_pipeline.hpp"
+#include "renderer/backend/shape_pipeline.hpp"
+#include "renderer/backend/splat_pipeline.hpp"
+#include "renderer/camera.hpp"
 #include "renderer/render_view.hpp"
-#include "renderer/shape_pipeline.hpp"
-#include "renderer/splat_pipeline.hpp"
 #include "utils/shader_cache.hpp"
 
 #include <glm/ext/matrix_float4x4.hpp>

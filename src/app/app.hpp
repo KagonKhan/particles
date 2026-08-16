@@ -1,12 +1,12 @@
 #ifndef YARR_APP_APP_HPP
 #define YARR_APP_APP_HPP
 
+#include "app/backend/imgui_layer.hpp"
+#include "app/backend/window.hpp"
 #include "app/console.hpp"
-#include "app/imgui_layer.hpp"
-#include "app/scene.hpp"
 #include "app/settings.hpp"
-#include "app/window.hpp"
 #include "logic/knob.hpp"
+#include "logic/scene.hpp"
 #include "renderer/renderer.hpp"
 #include "utils/bases.hpp"
 #include "utils/utils.hpp"
@@ -43,7 +43,8 @@ private:
 
     OutputConsole console;
 
-    float physicsUpdateAccumulator_ {0.0F};
+    float             physicsUpdateAccumulator_ {0.0F};
+    Knob<std::size_t> simulationStepLimit_ {"Simulation Step Limit", 8, 1, 16, "%d steps"};
 };
 
 #endif
