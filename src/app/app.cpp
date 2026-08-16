@@ -1,7 +1,5 @@
 #include "app.hpp"
 
-#include "exceptions.hpp"
-
 #include "utils/opengl.hpp"
 #include "utils/utils.hpp"
 
@@ -9,7 +7,6 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
-#include <string_view>
 
 
 #include "utils/shader_cache.hpp"
@@ -17,9 +14,7 @@
 namespace
 {
 
-std::filesystem::path  resource_string = PARTICLES_STRINGIFY(RESOURCE_DIR);
-const char* const      glsl_version    = "#version 440";
-const ImGuiWindowFlags window_flags    =
+const ImGuiWindowFlags window_flags =
     ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse |
     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
     ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
@@ -27,181 +22,22 @@ const ImGuiWindowFlags window_flags    =
 ;
 
 
-// How much of a frame's own timing shows up in the readout. Low enough that a single slow
-// frame nudges the number rather than throwing it.
 constexpr float kFrameTimeSmoothing = 0.05F;
-
-// A frame that cannot afford this many simulation steps stops trying to catch up. Without
-// a ceiling, a frame that runs long asks for more steps, which makes the next frame run
-// longer still.
-constexpr int kMaxStepsPerFrame = 8;
-
-// How often the interface is drawn while a benchmark is recording. Rare enough that the
-// rasterizer is effectively absent from the run, often enough that the progress bar moves and
-// the cancel button answers.
-constexpr float kBenchmarkUiPeriod = 0.1F;
-
-
-void glfw_error_callback(int error, const char* description)
-{
-    spdlog::error("Glfw Error {}: {}\n", error, description);
-}
+constexpr int   kMaxStepsPerFrame   = 8;
+constexpr float kBenchmarkUiPeriod  = 0.1F;
 
 } // namespace
 
 
 App::App(std::string const& title)
-{
-    // ===   GLFW INITIALIZATION   =====================================================================================
-    glfwSetErrorCallback(glfw_error_callback);
-    if (!glfwInit()) {
-        throw InitializationError("glfwInit failed!");
-    }
-
-
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);   // 3.2+
-    //  only glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // 3.0+ only
-
-    window = glfwCreateWindow(2560, 1440, title.c_str(), NULL, NULL);
-    if (window == NULL) {
-        throw InitializationError("Could not create a window");
-    }
-
-    glfwMakeContextCurrent(window);
-    if (glewInit() != GLEW_OK) {
-        exit(EXIT_FAILURE);
-    }
-
-    // Which driver answered, said out loud. A software rasterizer is a working renderer and
-    // announces itself no other way — it cost a day of benchmarking the wrong thing once.
-    auto const* const renderer_name = reinterpret_cast<char const*>(glGetString(GL_RENDERER));
-    spdlog::info(
-        "GL renderer: {} | {}",
-        renderer_name,
-        reinterpret_cast<char const*>(glGetString(GL_VERSION)));
-
-    if (std::string_view {renderer_name}.contains("llvmpipe")) {
-        spdlog::warn("Rendering in software. Expect ~10x the CPU, on threads that compete with the simulation.");
-    }
-
-    glfwSwapInterval(0);
-    // glfwSwapInterval(1); // Enable vsync
-    glEnable(GL_BLEND);
-
-    // ===   IMGUI INITIALIZATION   ====================================================================================
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;                   // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;                    // Enable Gamepad Controls
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;                       // Enable Docking
-    // io.ConfigFlags                 |= ImGuiConfigFlags_ViewportsEnable;  // Enable Multi-Viewport
-    io.ConfigViewportsNoAutoMerge   = true;
-    io.ConfigViewportsNoTaskBarIcon = true;
-
-    ImGui::StyleColorsDark();
-
-    ImGuiStyle& style = ImGui::GetStyle();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        style.WindowRounding              = 0.0f;
-        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    }
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(glsl_version);
-
-
-    // ===   SHADER INITIALIZATION   ===================================================================================
-    ShaderCache::compileProgram(
-        "PointProgram",
-        {
-            ShaderCache::load(
-                "point_vertex",
-                {
-                    .source = resource_string / "shaders/point.vert",
-                    .type   = GL_VERTEX_SHADER
-                }),
-            ShaderCache::load(
-                "point_fragment",
-                {
-                    .source = resource_string / "shaders/point.frag",
-                    .type   = GL_FRAGMENT_SHADER
-                }),
-        }
-    );
-
-    ShaderCache::compileProgram(
-        "ShapeProgram",
-        {
-            ShaderCache::load(
-                "shape_vertex",
-                {
-                    .source = resource_string / "shaders/shape.vert",
-                    .type   = GL_VERTEX_SHADER
-                }),
-            ShaderCache::load(
-                "shape_fragment",
-                {
-                    .source = resource_string / "shaders/shape.frag",
-                    .type   = GL_FRAGMENT_SHADER
-                }),
-        }
-    );
-
-    ShaderCache::compileProgram(
-        "SplatProgram",
-        {
-            ShaderCache::load(
-                "splat_compute",
-                {
-                    .source = resource_string / "shaders/splat.comp",
-                    .type   = GL_COMPUTE_SHADER
-                })
-        }
-    );
-
-    ShaderCache::compileProgram(
-        "ResolveProgram",
-        {
-            ShaderCache::load(
-                "fullscreen_vertex",
-                {
-                    .source = resource_string / "shaders/fullscreen.vert",
-                    .type   = GL_VERTEX_SHADER
-                }),
-            ShaderCache::load(
-                "density_fragment",
-                {
-                    .source = resource_string / "shaders/density.frag",
-                    .type   = GL_FRAGMENT_SHADER
-                }),
-        }
-    );
-
-
-    // TODO: Fix the ordering problems. Shader cache needs to load before renderer
-    renderer = new Renderer();
-}
-
-App::~App()
-{
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
-
-    glfwDestroyWindow(window);
-    glfwTerminate();
-}
+    : window_{2560, 1440, title}
+{}
 
 void App::run()
 {
     auto previousFrame = Time::measure();
 
-    while (!glfwWindowShouldClose(window)) {
+    while (!window_.shouldClose()) {
         auto start_time = Time::measure();
 
         // Floored, so a frame the clock reports as instantaneous cannot divide by zero
@@ -213,8 +49,8 @@ void App::run()
         previousFrame       = now;
         smoothedFrameTime_ += (dt - smoothedFrameTime_) * kFrameTimeSmoothing;
 
-        glfwPollEvents();
-        if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0) {
+        window_.pollEvents();
+        if (window_.iconified()) {
             ImGui_ImplGlfw_Sleep(10);
             continue;
         }
@@ -229,7 +65,7 @@ void App::run()
         // lands in every number the run produces. See docs/performance.md.
         uiAccumulator_ += dt;
 
-        if (scene.benchmarking() && (uiAccumulator_ < kBenchmarkUiPeriod)) {
+        if (scene_->benchmarking() && (uiAccumulator_ < kBenchmarkUiPeriod)) {
             // Slept rather than spun, so the one thread left awake is not competing either.
             ImGui_ImplGlfw_Sleep(1);
             continue;
@@ -242,7 +78,7 @@ void App::run()
         // buffer left over from the previous frame would occlude this frame's bodies.
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        startNewFrame();
+        imgui_.newFrame();
 
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -255,15 +91,16 @@ void App::run()
         ImGuiID dockspace_id = ImGui::GetID("RootDockSpace");
         ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
 
-        spdlog::debug("Scene settings render time: {}ms", Time::execution(&Scene::renderSettings, scene).count());
+        spdlog::debug("Scene settings render time: {}ms", Time::execution(&Scene::renderSettings, scene_).count());
         renderStats();
 
         // The scene pass is the expensive one — an upload of the whole pool and a million
         // particles rasterized — and it is the one a run does without entirely.
-        if (!scene.benchmarking()) {
+        if (!scene_->benchmarking()) {
+            auto const [width, height] = window_.framebufferSize();
             spdlog::debug(
                 "Rendering time: {}ms",
-                Time::execution(&Renderer::render, renderer, window, scene, dt).count());
+                Time::execution(&Renderer::render, renderer_, width, height, *scene_, dt).count());
         }
 
         ImGui::Begin("Console Log");
@@ -290,7 +127,7 @@ void App::stepSimulation(float dt)
 
     stepsLastFrame_ = 0;
     while ((simulationAccumulator_ >= step) && (stepsLastFrame_ < kMaxStepsPerFrame)) {
-        spdlog::debug("Scene update time: {}ms", Time::execution(&Scene::update, scene, step).count());
+        spdlog::debug("Scene update time: {}ms", Time::execution(&Scene::update, scene_, step).count());
         simulationAccumulator_ -= step;
         ++stepsLastFrame_;
     }
@@ -318,7 +155,7 @@ void App::renderStats()
     ImGui::Text("Steps this frame: %d", stepsLastFrame_);
 
     // The window will look frozen while this is up, which is the point rather than a fault.
-    if (scene.benchmarking()) {
+    if (scene_->benchmarking()) {
         ImGui::SeparatorText("Benchmark");
         ImGui::TextColored(ImVec4 {1.0F, 0.8F, 0.3F, 1.0F}, "Recording — scene rendering paused");
         ImGui::SetItemTooltip(
@@ -330,29 +167,11 @@ void App::renderStats()
     ImGui::End();
 }
 
-void App::startNewFrame()
-{
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-}
-
 void App::finishFrame()
 {
-    ImGui::Render();
-    int display_w, display_h;
-    glfwGetFramebufferSize(window, &display_w, &display_h);
+    auto const [display_w, display_h] = window_.framebufferSize();
     glViewport(0, 0, display_w, display_h);
 
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        GLFWwindow* backup_current_context = glfwGetCurrentContext();
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-        glfwMakeContextCurrent(backup_current_context);
-    }
-
-    glfwSwapBuffers(window);
+    imgui_.render();
+    window_.swapBuffers();
 }

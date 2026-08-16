@@ -18,9 +18,12 @@ struct Shader
 class ShaderCache : public PureStatic<ShaderCache>
 {
 public:
+
     ///@brief clears the shader cache
     static void unload();
 
+    ///@brief load all programs
+    static void loadDefaults();
     ///@brief compiles a shader and returns the handle. Overwrites if exists
     static GLuint load(std::string const& name, Shader const& shader);
     ///@brief compiles a program and returns the handle. Requires at least one shader.

@@ -37,6 +37,8 @@ add_executable(${PROJECT}
 
     src/app/app.cpp
     src/app/console.cpp
+    src/app/imgui_layer.cpp
+    src/app/window.cpp
 
     src/emitter/emitter.cpp
 
@@ -61,12 +63,18 @@ add_executable(${PROJECT}
     src/logic/particle_pool.hpp
     src/logic/shape.hpp
     src/logic/scene_object.hpp
+    src/logic/sdf.hpp
+    resources/shaders/sdf.inl
 )
 
 set_property(TARGET ${PROJECT} PROPERTY CXX_STANDARD 26)
 
 
-target_include_directories(${PROJECT} PUBLIC src)
+# resources/shaders is on the include path because sdf.inl lives there and is compiled twice:
+# once by this compiler through logic/sdf.hpp, once by the driver through shape.frag. It stays
+# beside the shaders rather than in src, since it is the shaders that cannot reach out of the
+# resource tree — shader_cache.cpp resolves their includes relative to the including file.
+target_include_directories(${PROJECT} PUBLIC src resources/shaders)
 
 target_link_libraries(${PROJECT} PUBLIC
     ImguiBindings

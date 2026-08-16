@@ -8,9 +8,13 @@
 // changing it — the radius for a circle, the half thickness for a capsule, and nothing at
 // all for a box, whose corners are sharp by definition.
 
-// A half plane is unbounded and a frame is a room, so shape_pipeline.cpp sends the first
-// over as the box it draws as and the second as the four boxes its walls are. Neither has
-// a case here.
+// The distance functions themselves, shared verbatim with the simulation that has to agree
+// about where these bodies are. Resolved by shader_cache.cpp, not by the driver.
+#include "sdf.inl"
+
+// These three are `GpuPrimitive` in shape_pipeline.cpp and have to hold the same values. A
+// half plane is unbounded and a frame is a room, so that file sends the first over as the box
+// it draws as and the second as the four boxes its walls are. Neither has a case here.
 const uint kCircle  = 0u;
 const uint kBox     = 1u;
 const uint kSegment = 2u;
@@ -33,50 +37,38 @@ uniform float ambient;
 
 out vec4 fragColor;
 
-float boxDistance(vec2 p, vec2 halfExtents)
-{
-    vec2 outside = abs(p) - halfExtents;
-    return length(max(outside, 0.0)) + min(max(outside.x, outside.y), 0.0);
-}
-
-// Has to stay in step with logic/shape.hpp.
+// The one thing sdf.inl cannot say for both sides: which primitive this is. Here that is a
+// vertex attribute to branch on, on the other side it is which alternative the variant holds.
 float outlineDistance(vec2 p)
 {
     if (bodyType == kBox) {
-        return boxDistance(p, bodyDimensions);
+        return sdfBox(p, bodyDimensions);
     }
 
     if (bodyType == kSegment) {
-        p.x -= clamp(p.x, -bodyDimensions.x, bodyDimensions.x);
-        return length(p) - bodyDimensions.y;
+        return sdfSegment(p, bodyDimensions.x, bodyDimensions.y);
     }
 
-    return length(p) - bodyDimensions.x;
+    return sdfCircle(p, bodyDimensions.x);
 }
 
 float filletRadius()
 {
     if (bodyType == kSegment) {
-        return bodyDimensions.y;
+        return sdfSegmentFillet(bodyDimensions.y);
     }
 
     if (bodyType == kCircle) {
-        return bodyDimensions.x; // the sphere case, when it equals the height
+        return sdfCircleFillet(bodyDimensions.x); // the sphere case, when it equals the height
     }
 
-    return 0.0; // a box keeps its corners
+    return sdfBoxFillet();
 }
 
 // Exact, so the march below can take full steps.
 float bodyDistance(vec3 world)
 {
-    float height = bodyExtents.z;
-    float fillet = min(filletRadius(), height);
-
-    vec2 profile = vec2(outlineDistance(world.xy - bodyOrigin) + fillet,
-                        abs(world.z) - (height - fillet));
-
-    return min(max(profile.x, profile.y), 0.0) + length(max(profile, 0.0)) - fillet;
+    return sdfExtrude(outlineDistance(world.xy - bodyOrigin), world.z, bodyExtents.z, filletRadius());
 }
 
 vec3 bodyNormal(vec3 world, float epsilon)

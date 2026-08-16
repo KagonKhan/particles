@@ -14,6 +14,21 @@ public:
     PureStatic &operator =(PureStatic&&)      = delete;
 };
 
+///@brief disables all special members but ctor
+template <typename Derived>
+class Immovable
+{
+public:
+    Immovable()  = default;
+    ~Immovable() = default;
+
+    Immovable(const Immovable&)             = delete;
+    Immovable(Immovable&&)                  = delete;
+    Immovable &operator =(const Immovable&) = delete;
+    Immovable &operator =(Immovable&&)      = delete;
+};
+
+
 ///@brief enables getInstance function. Disables normal creation.
 template <typename Derived>
 class Singleton

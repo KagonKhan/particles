@@ -1,6 +1,8 @@
 #ifndef YARR_LOGIC_SHAPE_HPP
 #define YARR_LOGIC_SHAPE_HPP
 
+#include "logic/sdf.hpp"
+
 #include <glm/common.hpp>
 #include <glm/ext/vector_float2.hpp>
 #include <glm/geometric.hpp>
@@ -8,21 +10,50 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstdint>
+#include <concepts>
+#include <cstddef>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 
-struct Circle { float radius {0.25F}; };
+// A shape carries the name it goes by, so that the list of shapes is the variant below and
+// nothing else. An enumeration and a table of names beside it would each be the same list
+// written again, and a list written twice is a list that will disagree with itself.
 
-struct Box { glm::vec2 halfExtents {0.25F, 0.25F}; };
+struct Circle
+{
+    static constexpr char const* kName = "Circle";
 
-struct Segment { float halfLength {1.0F}; float thickness {0.05F}; };
+    float radius {0.25F};
+};
 
-struct HalfPlane { float drawExtent {8.0F}; };
+struct Box
+{
+    static constexpr char const* kName = "Box";
+
+    glm::vec2 halfExtents {0.25F, 0.25F};
+};
+
+struct Segment
+{
+    static constexpr char const* kName = "Segment";
+
+    float halfLength {1.0F};
+    float thickness {0.05F};
+};
+
+struct HalfPlane
+{
+    static constexpr char const* kName = "Half plane";
+
+    float drawExtent {8.0F};
+};
 
 struct Frame
 {
+    static constexpr char const* kName = "Frame";
+
     glm::vec2 halfExtents {4.0F, 3.0F}; // the opening, i.e. the usable world
     float thickness {0.2F};
 };
@@ -30,77 +61,76 @@ struct Frame
 
 using Shape = std::variant<Circle, Box, Segment, HalfPlane, Frame>;
 
-enum class ObjectType : std::uint8_t
+inline constexpr std::size_t kShapeCount = std::variant_size_v<Shape>;
+
+namespace detail
 {
-    Circle,
-    Box,
-    Segment,
-    HalfPlane,
-    Frame,
-};
 
-static_assert(std::is_same_v<std::variant_alternative_t<0, Shape>, ::Circle>);
-static_assert(std::is_same_v<std::variant_alternative_t<1, Shape>, ::Box>);
-static_assert(std::is_same_v<std::variant_alternative_t<2, Shape>, ::Segment>);
-static_assert(std::is_same_v<std::variant_alternative_t<3, Shape>, ::HalfPlane>);
-static_assert(std::is_same_v<std::variant_alternative_t<4, Shape>, ::Frame>);
-
-inline constexpr std::array<char const*, std::variant_size_v<Shape>> kShapeNames {
-    "Circle",
-    "Box",
-    "Segment",
-    "Half plane",
-    "Frame",
-};
-
-[[nodiscard]] inline ObjectType typeOf(Shape const& shape) noexcept
+template <std::size_t... I>
+[[nodiscard]] constexpr auto shapeNames(std::index_sequence<I...> /*alternatives*/)
 {
-    return static_cast<ObjectType>(shape.index());
+    return std::array<char const*, sizeof...(I)> {std::variant_alternative_t<I, Shape>::kName...};
 }
+
+// The fold visits every alternative and exactly one of them assigns, which is a `switch` over
+// the variant that cannot be written with a case missing.
+template <std::size_t... I>
+[[nodiscard]] Shape shapeOfIndex(std::size_t index, std::index_sequence<I...> /*alternatives*/) noexcept
+{
+    Shape out;
+    ((I == index? void(out = std::variant_alternative_t<I, Shape> {}) : void()), ...);
+
+    return out;
+}
+
+} // namespace detail
+
+inline constexpr auto kShapeNames = detail::shapeNames(std::make_index_sequence<kShapeCount> {});
 
 [[nodiscard]] inline char const* shapeName(Shape const& shape) noexcept { return kShapeNames[shape.index()]; }
 
-[[nodiscard]] inline Shape defaultShape(ObjectType type) noexcept
+// A default-constructed alternative by its index in the variant, which is what the type combo
+// and the deserializer each have in hand. An index out of range gives the first alternative.
+[[nodiscard]] inline Shape defaultShape(std::size_t index) noexcept
 {
-    switch (type) {
-    case ObjectType::Box:
-        return Box {};
-
-    case ObjectType::Segment:
-        return Segment {};
-
-    case ObjectType::HalfPlane:
-        return HalfPlane {};
-
-    case ObjectType::Frame:
-        return Frame {};
-
-    case ObjectType::Circle:
-        return Circle {};
-    }
-
-    return Circle {};
+    return detail::shapeOfIndex(index, std::make_index_sequence<kShapeCount> {});
 }
 
+// `Shape` itself and nothing else, which every overload below that takes the variant is
+// constrained on.
+//
+// Taking `Shape const&` plainly does not mean that: a variant is implicitly constructible
+// from any one of its alternatives, so such an overload also accepts a single shape. It is
+// then the candidate that a shape added *without* its own overload silently binds to — and
+// since these all dispatch by visiting, that shape's case would call the dispatcher, which
+// would visit, which would call the dispatcher, until the stack ran out. A shape missing its
+// overload has to fail to compile; unconstrained it instead compiles and then dies at the
+// first particle that reaches it.
+template <typename T>
+concept AnyShape = std::same_as<std::remove_cvref_t<T>, Shape>;
+
 // === DISTANCE ========================================================================================================
-// Signed distance to the outline, negative inside, in the shape's own frame. Free
-// overloads, so adding a shape stops the visits below compiling until it is handled.
+// Signed distance to the outline, negative inside, in the shape's own frame. Free overloads,
+// so adding a shape stops the visits below compiling until it is handled — which is what the
+// AnyShape constraint on those visits is there to make true rather than nearly true.
+//
+// The three the renderer also marches read their field out of sdf.inl rather than stating it
+// again. What is left here is the mapping from a shape's own parameters onto that field,
+// which is the part the shader has no use for — it is handed dimensions already reduced.
 
 [[nodiscard]] inline float signedDistance(Circle shape, glm::vec2 point) noexcept
 {
-    return glm::length(point) - shape.radius;
+    return glsl::sdfCircle(point, shape.radius);
 }
 
 [[nodiscard]] inline float signedDistance(Box shape, glm::vec2 point) noexcept
 {
-    glm::vec2 const outside = glm::abs(point) - shape.halfExtents;
-    return glm::length(glm::max(outside, 0.0F)) + std::min(std::max(outside.x, outside.y), 0.0F);
+    return glsl::sdfBox(point, shape.halfExtents);
 }
 
 [[nodiscard]] inline float signedDistance(Segment shape, glm::vec2 point) noexcept
 {
-    point.x -= std::clamp(point.x, -shape.halfLength, shape.halfLength);
-    return glm::length(point) - (shape.thickness * 0.5F);
+    return glsl::sdfSegment(point, shape.halfLength, shape.thickness * 0.5F);
 }
 
 [[nodiscard]] inline float signedDistance([[maybe_unused]] HalfPlane shape, glm::vec2 point) noexcept
@@ -117,7 +147,7 @@ inline constexpr std::array<char const*, std::variant_size_v<Shape>> kShapeNames
     return std::abs(signedDistance(Box {shape.halfExtents + half}, point)) - half;
 }
 
-[[nodiscard]] inline float signedDistance(Shape const& shape, glm::vec2 point) noexcept
+[[nodiscard]] inline float signedDistance(AnyShape auto const& shape, glm::vec2 point) noexcept
 {
     return std::visit([point] (auto concrete) { return signedDistance(concrete, point); }, shape);
 }
@@ -172,7 +202,7 @@ inline constexpr std::array<char const*, std::variant_size_v<Shape>> kShapeNames
     return inward * gradient(centreline, point);
 }
 
-[[nodiscard]] inline glm::vec2 gradient(Shape const& shape, glm::vec2 point) noexcept
+[[nodiscard]] inline glm::vec2 gradient(AnyShape auto const& shape, glm::vec2 point) noexcept
 {
     return std::visit([point] (auto concrete) { return gradient(concrete, point); }, shape);
 }
@@ -180,15 +210,20 @@ inline constexpr std::array<char const*, std::variant_size_v<Shape>> kShapeNames
 // === FILLET ==========================================================================================================
 // Largest ball that rolls along the inside of the outline without changing it, and so how
 // much a body's edges may be rounded by. A box tolerates none — rounded corners are not
-// the box. shape.frag mirrors these and has to stay in step.
+// the box. Out of sdf.inl, since the renderer rounds by this too and a body drawn with a
+// different fillet than it collides with is a thing you can look straight at and not see.
+//
+// A half plane and a frame have no fillet of their own to share: neither is a primitive the
+// shader knows, and shape_pipeline.cpp lowers both to boxes. So both take the box's, which
+// is what they are in fact drawn with.
 
-[[nodiscard]] inline float filletRadius(Circle shape) noexcept                 { return shape.radius; }
-[[nodiscard]] inline float filletRadius([[maybe_unused]] Box shape) noexcept   { return 0.0F; }
-[[nodiscard]] inline float filletRadius(Segment shape) noexcept                { return shape.thickness * 0.5F; }
-[[nodiscard]] inline float filletRadius([[maybe_unused]] HalfPlane s) noexcept { return 0.0F; }
-[[nodiscard]] inline float filletRadius([[maybe_unused]] Frame shape) noexcept { return 0.0F; }
+[[nodiscard]] inline float filletRadius(Circle shape) noexcept  { return glsl::sdfCircleFillet(shape.radius); }
+[[nodiscard]] inline float filletRadius(Segment shape) noexcept { return glsl::sdfSegmentFillet(shape.thickness * 0.5F); }
+[[nodiscard]] inline float filletRadius([[maybe_unused]] Box shape) noexcept       { return glsl::sdfBoxFillet(); }
+[[nodiscard]] inline float filletRadius([[maybe_unused]] HalfPlane shape) noexcept { return glsl::sdfBoxFillet(); }
+[[nodiscard]] inline float filletRadius([[maybe_unused]] Frame shape) noexcept     { return glsl::sdfBoxFillet(); }
 
-[[nodiscard]] inline float filletRadius(Shape const& shape) noexcept
+[[nodiscard]] inline float filletRadius(AnyShape auto const& shape) noexcept
 {
     return std::visit([] (auto concrete) { return filletRadius(concrete); }, shape);
 }
@@ -236,7 +271,7 @@ struct Contact
     return {.distance = -signedDistance(opening, point), .normal = -gradient(opening, point)};
 }
 
-[[nodiscard]] inline Contact contact(Shape const& shape, glm::vec2 point) noexcept
+[[nodiscard]] inline Contact contact(AnyShape auto const& shape, glm::vec2 point) noexcept
 {
     return std::visit([point] (auto concrete) { return contact(concrete, point); }, shape);
 }

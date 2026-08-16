@@ -8,17 +8,32 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <variant>
 
 namespace
 {
 
+// The primitives shape.frag can march, and the whole of the contract between this file and
+// it: kCircle, kBox and kSegment there are these values here.
+//
+// Deliberately not `Shape`'s list. A shape the shader has no case for is lowered on this side
+// instead of being added on that one — a half plane to the slab it draws as, a frame to the
+// four boxes its walls are — so this set stays at three however many shapes exist, and adding
+// one cannot silently renumber what the shader is being told.
+enum class GpuPrimitive : std::uint8_t
+{
+    Circle  = 0,
+    Box     = 1,
+    Segment = 2,
+};
+
 struct Drawn
 {
-    ObjectType type;
-    glm::vec2  dimensions; // as shape.frag reads them back out
-    glm::vec2  offset;     // local-space shift from the object's origin
-    glm::vec2  footprint;  // local half-extents about the shifted origin
+    GpuPrimitive type;
+    glm::vec2    dimensions; // as shape.frag reads them back out
+    glm::vec2    offset;     // local-space shift from the object's origin
+    glm::vec2    footprint;  // local half-extents about the shifted origin
 };
 
 // A shape is drawn as one body or as several, and the footprints are what the march is
@@ -34,18 +49,18 @@ struct Drawing
 
 [[nodiscard]] Drawing drawnAs(Circle shape) noexcept
 {
-    return {{Drawn {ObjectType::Circle, {shape.radius, 0.0F}, {}, glm::vec2 {shape.radius}}}, 1};
+    return {{Drawn {GpuPrimitive::Circle, {shape.radius, 0.0F}, {}, glm::vec2 {shape.radius}}}, 1};
 }
 
 [[nodiscard]] Drawing drawnAs(Box shape) noexcept
 {
-    return {{Drawn {ObjectType::Box, shape.halfExtents, {}, shape.halfExtents}}, 1};
+    return {{Drawn {GpuPrimitive::Box, shape.halfExtents, {}, shape.halfExtents}}, 1};
 }
 
 [[nodiscard]] Drawing drawnAs(Segment shape) noexcept
 {
     float const half = shape.thickness * 0.5F;
-    return {{Drawn {ObjectType::Segment, {shape.halfLength, half}, {}, {shape.halfLength + half, half}}}, 1};
+    return {{Drawn {GpuPrimitive::Segment, {shape.halfLength, half}, {}, {shape.halfLength + half, half}}}, 1};
 }
 
 // Unbounded in the field the simulation sees, so it is drawn as the finite slab hanging
@@ -53,7 +68,7 @@ struct Drawing
 [[nodiscard]] Drawing drawnAs(HalfPlane shape) noexcept
 {
     glm::vec2 const half {shape.drawExtent, shape.drawExtent * 0.5F};
-    return {{Drawn {ObjectType::Box, half, {0.0F, -half.y}, half}}, 1};
+    return {{Drawn {GpuPrimitive::Box, half, {0.0F, -half.y}, half}}, 1};
 }
 
 // Four walls rather than the one shelled box the distance field is: as a single body its
@@ -72,10 +87,10 @@ struct Drawing
 
     return {
         {
-            Drawn {ObjectType::Box, side, {-sideX, 0.0F}, side},
-            Drawn {ObjectType::Box, side, {sideX, 0.0F}, side},
-            Drawn {ObjectType::Box, cap, {0.0F, -capY}, cap},
-            Drawn {ObjectType::Box, cap, {0.0F, capY}, cap},
+            Drawn {GpuPrimitive::Box, side, {-sideX, 0.0F}, side},
+            Drawn {GpuPrimitive::Box, side, {sideX, 0.0F}, side},
+            Drawn {GpuPrimitive::Box, cap, {0.0F, -capY}, cap},
+            Drawn {GpuPrimitive::Box, cap, {0.0F, capY}, cap},
         },
         4
     };

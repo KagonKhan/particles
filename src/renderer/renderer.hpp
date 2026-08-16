@@ -7,11 +7,11 @@
 #include "renderer/render_view.hpp"
 #include "renderer/shape_pipeline.hpp"
 #include "renderer/splat_pipeline.hpp"
+#include "utils/shader_cache.hpp"
 
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <GL/glew.h> // or whatever GL loader you use
-#include <GLFW/glfw3.h>
 #include <cstdint>
 
 class Scene;
@@ -25,7 +25,10 @@ enum class RenderMode : std::uint8_t
 class Renderer
 {
 public:
-    void render(GLFWwindow* window, Scene& scene, float dt);
+    Renderer() { ShaderCache::loadDefaults(); }
+    ///@brief Draws one frame into a framebuffer of the given size. The size is passed in
+    /// rather than queried, so nothing here has to know what kind of window it came from.
+    void render(int width, int height, Scene& scene, float dt);
 
 private:
     void renderSettings(float dt);

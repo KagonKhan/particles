@@ -5,9 +5,87 @@
 
 #include <spdlog/common.h>
 
+#include <filesystem>
+#include <format>
+#include <sstream>
+#include <string>
+#include <string_view>
+
 
 namespace
 {
+
+std::filesystem::path      resource_string   = PARTICLES_STRINGIFY(RESOURCE_DIR);
+constexpr std::string_view kIncludeDirective = "#include";
+constexpr int              kMaxIncludeDepth  = 8;
+
+[[nodiscard]] std::string_view trimLeft(std::string_view text)
+{
+    std::size_t const first = text.find_first_not_of(" \t");
+    return (first == std::string_view::npos)? std::string_view {} : text.substr(first);
+}
+
+// The quoted name of an `#include "..."` line, or nothing if the line is not one. No angled
+// form: there is no system include path for a shader to reach into.
+[[nodiscard]] std::string_view includedName(std::string_view line)
+{
+    std::string_view rest = trimLeft(line);
+
+    if (!rest.starts_with(kIncludeDirective)) {
+        return {};
+    }
+
+    rest = trimLeft(rest.substr(kIncludeDirective.size()));
+
+    if (!rest.starts_with('"')) {
+        return {};
+    }
+
+    rest = rest.substr(1);
+    std::size_t const end = rest.find('"');
+
+    return (end == std::string_view::npos)? std::string_view {} : rest.substr(0, end);
+}
+
+// GLSL has no #include of its own short of GL_ARB_shading_language_include, which is not
+// widely served. One shared file — the distance functions the simulation evaluates too, so
+// that bodies collide where they are drawn — is worth resolving it here instead.
+//
+// The `#line` after a splice puts the host file's numbering back, so an error below an
+// include still names the line you would count to. Note that GLSL through 4.40 specifies
+// `#line n` as meaning the *next* line is n+1 where 4.50 and C mean it is n, so on a strict
+// 4.40 driver the reported line may be one out. It is diagnostics either way.
+[[nodiscard]] std::string resolveIncludes(std::filesystem::path const& path, int depth = 0)
+{
+    if (depth > kMaxIncludeDepth) {
+        throw ShaderError(
+                  "{}: #include nested more than {} deep, which is a cycle in all but name",
+                  path.string(),
+                  kMaxIncludeDepth);
+    }
+
+    std::istringstream source {fileToString(path)};
+    std::string        resolved;
+    std::string        line;
+
+    for (int number = 1; std::getline(source, line); ++number) {
+        std::string_view const name = includedName(line);
+
+        if (name.empty()) {
+            resolved += line;
+            resolved += '\n';
+            continue;
+        }
+
+        // Resolved against the including file's own directory, so a shader names its
+        // neighbours the way its text reads rather than the way it happened to be launched.
+        resolved += "#line 1\n";
+        resolved += resolveIncludes(path.parent_path() / name, depth + 1);
+        resolved += std::format("#line {}\n", number + 1);
+    }
+
+    return resolved;
+}
 
 void printShaderLog(GLuint shader)
 {
@@ -35,7 +113,7 @@ GLuint compileShader(Shader const& shader)
 {
     GLuint gl_shader = glCreateShader(shader.type);
 
-    std::string source   = fileToString(shader.source);
+    std::string source   = resolveIncludes(shader.source);
     const char* source_c = source.c_str();
 
     glShaderSource(gl_shader, 1, &source_c, nullptr);
@@ -91,6 +169,76 @@ void ShaderCache::unload()
     compiledCache_.clear();
     programCache_.clear();
     shaderCache_.clear();
+}
+
+void ShaderCache::loadDefaults()
+{
+// ===   SHADER INITIALIZATION   ===================================================================================
+    ShaderCache::compileProgram(
+        "PointProgram",
+        {
+            ShaderCache::load(
+                "point_vertex",
+                {
+                    .source = resource_string / "shaders/point.vert",
+                    .type   = GL_VERTEX_SHADER
+                }),
+            ShaderCache::load(
+                "point_fragment",
+                {
+                    .source = resource_string / "shaders/point.frag",
+                    .type   = GL_FRAGMENT_SHADER
+                }),
+        }
+    );
+
+    ShaderCache::compileProgram(
+        "ShapeProgram",
+        {
+            ShaderCache::load(
+                "shape_vertex",
+                {
+                    .source = resource_string / "shaders/shape.vert",
+                    .type   = GL_VERTEX_SHADER
+                }),
+            ShaderCache::load(
+                "shape_fragment",
+                {
+                    .source = resource_string / "shaders/shape.frag",
+                    .type   = GL_FRAGMENT_SHADER
+                }),
+        }
+    );
+
+    ShaderCache::compileProgram(
+        "SplatProgram",
+        {
+            ShaderCache::load(
+                "splat_compute",
+                {
+                    .source = resource_string / "shaders/splat.comp",
+                    .type   = GL_COMPUTE_SHADER
+                })
+        }
+    );
+
+    ShaderCache::compileProgram(
+        "ResolveProgram",
+        {
+            ShaderCache::load(
+                "fullscreen_vertex",
+                {
+                    .source = resource_string / "shaders/fullscreen.vert",
+                    .type   = GL_VERTEX_SHADER
+                }),
+            ShaderCache::load(
+                "density_fragment",
+                {
+                    .source = resource_string / "shaders/density.frag",
+                    .type   = GL_FRAGMENT_SHADER
+                }),
+        }
+    );
 }
 
 GLuint ShaderCache::load(std::string const& name, Shader const& shader)

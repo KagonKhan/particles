@@ -1,46 +1,46 @@
 #ifndef YARR_APP_APP_HPP
 #define YARR_APP_APP_HPP
- #define GLM_ENABLE_EXPERIMENTAL
+
 #include "app/console.hpp"
+#include "app/imgui_layer.hpp"
 #include "app/scene.hpp"
+#include "app/window.hpp"
 #include "renderer/renderer.hpp"
+#include "utils/bases.hpp"
 
-#include <GLFW/glfw3.h>
-
+#include <memory>
 #include <string>
 
-class App
+
+class App : public Immovable<App>
 {
 public:
     App(std::string const& title);
-    ~App();
+
+    App(const App&)             = delete;
+    App(App&&)                  = delete;
+    App &operator =(const App&) = delete;
+    App &operator =(App&&)      = delete;
 
     void run();
 
 private:
-    void initializeGLFW(std::string const& window_name);
-    void initializeIMGUI();
-
-    void startNewFrame();
     void finishFrame();
 
     void stepSimulation(float dt);
     void renderStats();
 
-    GLFWwindow*   window;
-    Renderer*     renderer;
-    Scene         scene;
+    Window                    window_;
+    ImGuiLayer                imgui_ {window_};
+    std::unique_ptr<Renderer> renderer_ {new Renderer};
+    std::unique_ptr<Scene>    scene_ {new Scene};
+
     OutputConsole console;
 
-    // Exponentially smoothed, because a readout driven by a single frame's dt flickers too
-    // hard to read the moment the frame rate is high.
-    float smoothedFrameTime_ {1.0F / 60.0F};
-
-    // How often the simulation steps, independent of how often a frame is drawn. Time the
-    // frames deliver but the simulation has not consumed yet waits in the accumulator.
-    float simulationRate_ {60.0F};
-    float simulationAccumulator_ {0.0F};
-    int   stepsLastFrame_ {0};
+    float smoothedFrameTime_     = 1.0F / 60.0F;
+    float simulationRate_        = 60.0F;
+    float simulationAccumulator_ = 0.0F;
+    int   stepsLastFrame_        = 0;
 
     // Time since the interface was last drawn. Only consulted while a benchmark is
     // recording, when frames are deliberately rare.

@@ -1,18 +1,16 @@
 #ifndef YARR_LOGIC_SCENE_OBJECT_HPP
 #define YARR_LOGIC_SCENE_OBJECT_HPP
 
+#include "logic/sdf.hpp"
 #include "logic/shape.hpp"
 
 #include <glm/ext/vector_float2.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/ext/vector_float4.hpp>
-#include <glm/geometric.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <nlohmann/json.hpp>
 
-#include <cmath>
-#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <variant>
@@ -36,18 +34,12 @@ struct SceneObject
 };
 
 
-// The solid the shape describes: its outline extruded `height` either side of the plane,
-// with the edges filleted by as much as the outline can take. shape.frag builds the same
-// thing and the two have to stay in step.
+// The solid the shape describes: its outline extruded `height` either side of the plane, with
+// the edges filleted by as much as the outline can take. The extrusion itself is the one
+// sdf.inl gives the renderer, so this is only the outline fed into it.
 [[nodiscard]] inline float bodyDistance(Shape const& shape, float height, glm::vec3 local) noexcept
 {
-    float const fillet = std::min(filletRadius(shape), height);
-
-    glm::vec2 const profile {
-        signedDistance(shape, glm::vec2 {local}) + fillet,
-        std::abs(local.z) - (height - fillet)};
-
-    return std::min(std::max(profile.x, profile.y), 0.0F) + glm::length(glm::max(profile, 0.0F)) - fillet;
+    return glsl::sdfExtrude(signedDistance(shape, glm::vec2 {local}), local.z, height, filletRadius(shape));
 }
 
 // Particles are flat, so they meet a body at z = 0.
@@ -100,7 +92,7 @@ inline bool renderShapeSettings(Shape& shape)
     bool changed = ImGui::Combo("Type", &type, kShapeNames.data(), static_cast<int>(kShapeNames.size()));
 
     if (changed) {
-        shape = defaultShape(static_cast<ObjectType>(type));
+        shape = defaultShape(static_cast<std::size_t>(type));
     }
 
     return std::visit([] (auto& concrete) { return renderShapeFields(concrete); }, shape) || changed;
@@ -237,7 +229,7 @@ inline void deserialize(Shape& shape, nlohmann::json const& in)
 
         for (std::size_t i = 0; i < kShapeNames.size(); ++i) {
             if (name == kShapeNames[i]) {
-                shape = defaultShape(static_cast<ObjectType>(i));
+                shape = defaultShape(i);
                 break;
             }
         }
