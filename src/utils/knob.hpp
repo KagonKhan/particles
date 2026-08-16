@@ -1,5 +1,5 @@
-#ifndef YARR_LOGIC_KNOB_HPP
-#define YARR_LOGIC_KNOB_HPP
+#ifndef YARR_UTILS_KNOB_HPP
+#define YARR_UTILS_KNOB_HPP
 
 
 #include <imgui.h>
@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -60,8 +61,9 @@ private:
 class KnobBase
 {
 public:
-    explicit KnobBase(char const* name) noexcept
-        : name_{name} {}
+    KnobBase(char const* name, std::string tooltip) noexcept
+        : name_{name},
+          tooltip_{std::move(tooltip)} {}
     virtual ~KnobBase() = default;
 
     virtual bool render() = 0;
@@ -69,8 +71,9 @@ public:
     [[nodiscard]] virtual nlohmann::json serialize() const                     = 0;
     virtual void                         deserialize(nlohmann::json const& in) = 0;
 
-    [[nodiscard]] char const* name() const noexcept { return name_; }
-    [[nodiscard]] int         id() const noexcept   { return id_.get(); }
+    [[nodiscard]] char const*        name() const noexcept    { return name_; }
+    [[nodiscard]] std::string const& tooltip() const noexcept { return tooltip_; }
+    [[nodiscard]] int                id() const noexcept      { return id_.get(); }
 
 protected:
     KnobBase(KnobBase const&)             = default;
@@ -78,9 +81,18 @@ protected:
     KnobBase& operator =(KnobBase const&) = default;
     KnobBase& operator =(KnobBase&&)      = default;
 
+    // Called right after the widget, while it is still the current item.
+    void renderTooltip() const
+    {
+        if (!tooltip_.empty()) {
+            ImGui::SetItemTooltip("%s", tooltip_.c_str());
+        }
+    }
+
 private:
     WidgetId    id_;
     char const* name_;
+    std::string tooltip_;
 };
 
 
@@ -94,8 +106,9 @@ public:
         T                low,
         T                high,
         char const*      format,
-        ImGuiSliderFlags flags = ImGuiSliderFlags_AlwaysClamp) noexcept
-        : KnobBase{name},
+        std::string      tooltip = {},
+        ImGuiSliderFlags flags   = ImGuiSliderFlags_AlwaysClamp) noexcept
+        : KnobBase{name, std::move(tooltip)},
           format_{format},
           value_{value},
           default_{value},
@@ -114,6 +127,8 @@ public:
             value_  = default_;
             changed = true;
         }
+
+        renderTooltip();
 
         ImGui::PopID();
 
@@ -165,8 +180,8 @@ template <>
 class Knob<bool> final : public KnobBase
 {
 public:
-    Knob(char const* name, bool value) noexcept
-        : KnobBase{name},
+    Knob(char const* name, bool value, std::string tooltip = {}) noexcept
+        : KnobBase{name, std::move(tooltip)},
           value_{value},
           default_{value}
     {}
@@ -181,6 +196,8 @@ public:
             value_  = default_;
             changed = true;
         }
+
+        renderTooltip();
 
         ImGui::PopID();
 
@@ -198,6 +215,9 @@ public:
 
     [[nodiscard]] bool get() const noexcept { return value_; }
 
+    // For the widgets that write the value themselves, such as a window's close button.
+    [[nodiscard]] bool* address() noexcept { return &value_; }
+
     void set(bool value) noexcept { value_ = value; }
 
 private:
@@ -212,8 +232,11 @@ template <>
 class Knob<char const*> final : public KnobBase
 {
 public:
-    Knob(char const* name, std::span<char const* const> options, int value = 0) noexcept
-        : KnobBase{name},
+    Knob(char const*                 name,
+        std::span<char const* const> options,
+        int                          value   = 0,
+        std::string                  tooltip = {}) noexcept
+        : KnobBase{name, std::move(tooltip)},
           options_{options},
           value_{clampIndex(value)},
           default_{value_}
@@ -233,6 +256,8 @@ public:
             value_  = default_;
             changed = true;
         }
+
+        renderTooltip();
 
         ImGui::PopID();
 
@@ -323,4 +348,4 @@ inline void deserializeKnobs(std::span<KnobBase* const> knobs, nlohmann::json co
     }
 }
 
-#endif // YARR_LOGIC_KNOB_HPP
+#endif // YARR_UTILS_KNOB_HPP

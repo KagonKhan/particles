@@ -1,9 +1,9 @@
 #ifndef YARR_LOGIC_BEHAVIOR_HPP
 #define YARR_LOGIC_BEHAVIOR_HPP
 
-#include "logic/knob.hpp"
 #include "logic/particle_pool.hpp"
 #include "logic/scene_object.hpp"
+#include "utils/knob.hpp"
 
 #include <glm/ext/vector_float2.hpp>
 #include <glm/geometric.hpp>

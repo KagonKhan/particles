@@ -1,9 +1,9 @@
 #ifndef YARR_APP_WINDOW_HPP
 #define YARR_APP_WINDOW_HPP
 
+#include "app/backend/imgui_layer.hpp"
 #include "renderer/render_view.hpp"
 #include "utils/bases.hpp"
-#include "utils/opengl.hpp"
 
 // Left to itself glfw3.h pulls in the system gl.h, which glew.h refuses to follow.
 #define GLFW_INCLUDE_NONE
@@ -13,9 +13,6 @@
 #include <string>
 
 
-// GLFWwindow is opaque — GLFW allocates it and frees it, and never completes the type. The
-// default deleter is a `delete` on an incomplete type, which does not compile and would be
-// the wrong call even if it did.
 struct GlfwWindowDeleter
 {
     void operator ()(GLFWwindow* window) const noexcept { glfwDestroyWindow(window); }
@@ -24,8 +21,6 @@ struct GlfwWindowDeleter
 using WindowHandle = std::unique_ptr<GLFWwindow, GlfwWindowDeleter>;
 
 
-// glfwTerminate frees every window GLFW still holds, so it has to run after the handle
-// below is destroyed. Declared before it, it does.
 struct GlfwLibrary : public Immovable<GlfwLibrary>
 {
     GlfwLibrary();
@@ -45,37 +40,23 @@ public:
         return glfwGetWindowAttrib(window_.get(), GLFW_ICONIFIED) != 0;
     }
 
-    void clear()
-    {
-        glClearColor(0.0, 0.0, 0.0, 1.0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    }
+    void beginFrame();
+    void pollEvents() const noexcept { glfwPollEvents(); }
+    void endFrame();
 
-    [[nodiscard]] FramebufferSize size() const noexcept
-    {
-        FramebufferSize size;
-        glfwGetFramebufferSize(window_.get(), &size.width, &size.height);
-        return size;
-    }
+    [[nodiscard]] FramebufferSize size() const noexcept;
+    void                          setVSync(bool enabled) noexcept;
 
-    void pollEvents() const noexcept  { glfwPollEvents(); }
-    void swapBuffers() const noexcept { glfwSwapBuffers(window_.get()); }
-
-    // Idempotent, so a caller holding a setting can hand it over every frame without
-    // paying for a driver call it does not need.
-    void setVSync(bool enabled) noexcept
-    {
-        if (enabled == vsync_) {
-            return;
-        }
-
-        vsync_ = enabled;
-        glfwSwapInterval(enabled? 1 : 0);
-    }
 
 private:
+    ///@brief Creates the window and makes its context current, GLEW included.
+    [[nodiscard]] static WindowHandle open(int width, int height, std::string const& title);
+
+    // Declaration order is lifetime order: GLFW before the window, the window before the
+    // interface layer that installs callbacks on it and holds GL objects from its context.
     GlfwLibrary  glfw_;
     WindowHandle window_;
+    ImGuiLayer   imgui_ {window_.get()};
 
     bool vsync_ {false};
 };

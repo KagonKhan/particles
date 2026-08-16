@@ -3,7 +3,11 @@
 
 #include <spdlog/sinks/base_sink.h>
 
+#include <chrono>
+#include <iterator>
+#include <mutex>
 #include <string>
+#include <vector>
 
 
 struct ConsoleMessage
@@ -16,7 +20,8 @@ struct ConsoleMessage
 class ImGuiConsoleSink : public spdlog::sinks::base_sink<std::mutex>
 {
 public:
-    void drain(std::vector<ConsoleMessage>& out)
+    template <typename Container>
+    void drain(Container& out)
     {
         std::lock_guard lock(base_sink::mutex_);
         if (pending_.empty()) {

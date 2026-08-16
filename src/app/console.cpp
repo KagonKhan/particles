@@ -1,259 +1,233 @@
 #include "app/console.hpp"
 
-#include <fmt/chrono.h>
+#include "app/styling.hpp"
+#include "utils/imgui_utils.hpp"
+#include "utils/time_utils.hpp"
+
 #include <fmt/format.h>
 #include <imgui.h>
 #include <spdlog/spdlog.h>
+
 #include <algorithm>
-#include <array>
+#include <iterator>
+#include <utility>
 
+using ImGuiUtils::FlowLayout;
+using Styling::messageColor;
 
-namespace
-{
-
-ImU32 messageColor(spdlog::level::level_enum level)
-{
-    // Indexed by spdlog::level::level_enum: trace, debug, info, warn, err, critical, off.
-    static constexpr std::array<ImU32, spdlog::level::n_levels> LEVEL_COLORS {
-        IM_COL32(110, 110, 110, 255), // trace
-        IM_COL32(140, 140, 140, 255), // debug
-        IM_COL32(112, 179, 123, 255), // info
-        IM_COL32(193, 102, 1, 255),   // warn
-        IM_COL32(198, 0, 3, 255),     // err
-        IM_COL32(198, 0, 129, 255),   // critical
-        IM_COL32(255, 255, 255, 255), // off
-    };
-
-    auto const index = static_cast<std::size_t>(level);
-    return LEVEL_COLORS[std::min(index, LEVEL_COLORS.size() - 1)];
-}
-
-// ImGui only knows an item's size once it has been submitted, so wrapping a toolbar means
-// predicting the width of the next item before deciding to keep it on the current line.
-float checkboxWidth(char const* label)
-{
-    return ImGui::GetFrameHeight() // the square
-           + ImGui::GetStyle().ItemInnerSpacing.x
-           + ImGui::CalcTextSize(label, nullptr, true).x;
-}
-
-// An item submitted after SetNextItemWidth(), plus its trailing label.
-float labeledItemWidth(float itemWidth, char const* label)
-{
-    return itemWidth
-           + ImGui::GetStyle().ItemInnerSpacing.x
-           + ImGui::CalcTextSize(label, nullptr, true).x;
-}
-
-} // namespace
-
-OutputConsole::OutputConsole()
+OutputConsole::OutputConsole(std::shared_ptr<ImGuiConsoleSink> logSink)
+    : sink{std::move(logSink)}
 {
     Settings::getInstance().describe("View", "Console", "The log panel. Messages keep arriving while it is hidden.");
-
-    spdlog::default_logger()->sinks().push_back(sink);
-    messages.reserve(static_cast<std::size_t>(settings.maxMessages));
-    visible.reserve(static_cast<std::size_t>(settings.maxMessages));
 }
 
 void OutputConsole::update()
 {
-    pullNewMessages();
-    rebuildFilterIfNeeded();
+    applySettings();
+    log.drain(*sink);
 }
 
 void OutputConsole::render()
 {
-    if (!visible_.get()) {
+    if (!panelVisible.get()) {
         return;
     }
 
-    ImGui::Begin("Console Log");
-    ImGui::SeparatorText("Console");
+    if (ImGui::Begin("Console Log", panelVisible.address())) {
+        renderToolbar();
 
-    renderToolbar();
-    renderMessages(ImVec2{0, 0});
+        // Again, so a change just made in the toolbar takes effect in this frame rather than
+        // the next one. Both setters are no-ops when the value has not moved.
+        applySettings();
+
+        renderMessages();
+    }
 
     ImGui::End();
 }
 
-void OutputConsole::renderToolbar()
+void OutputConsole::applySettings()
 {
-    // Toolbar items stay on one line while they fit and wrap onto the next when they do not.
-    static constexpr float FIELD_WIDTH {100.0f};
-
-    float const rightEdge = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
-
-    auto const sameLineIfFits = [rightEdge] (float nextWidth) {
-            float const nextX =
-                ImGui::GetItemRectMax().x + ImGui::GetStyle().ItemSpacing.x + nextWidth;
-
-            if (nextX < rightEdge) {
-                ImGui::SameLine();
-            }
-        };
-
-    if (ImGui::Button("clear")) {
-        messages.clear();
-        visible.clear();
-        filteredCount = 0;
-    }
-
-    sameLineIfFits(labeledItemWidth(FIELD_WIDTH, "Filter messages"));
-    ImGui::SetNextItemWidth(FIELD_WIDTH);
-    ImGui::Combo(
-        "Filter messages",
-        &settings.selectedMessageLevel,
-        "trace\0debug\0info\0warning\0error\0critical\0\0"
-    );
-
-    sameLineIfFits(checkboxWidth("Timestamps"));
-    ImGui::Checkbox("Timestamps", &settings.showTimestamps);
-
-    sameLineIfFits(checkboxWidth("Levels"));
-    ImGui::Checkbox("Levels", &settings.showLevels);
-
-    sameLineIfFits(checkboxWidth("Wrap"));
-    ImGui::Checkbox("Wrap", &settings.wrapText);
-
-    sameLineIfFits(checkboxWidth("Auto-scroll"));
-    ImGui::Checkbox("Auto-scroll", &settings.autoScroll);
-
-    sameLineIfFits(labeledItemWidth(FIELD_WIDTH, "Max messages"));
-    ImGui::SetNextItemWidth(FIELD_WIDTH);
-    ImGui::DragInt(
-        "Max messages",
-        &settings.maxMessages,
-        8.0f,
-        MIN_MAX_MESSAGES,
-        MAX_MAX_MESSAGES,
-        "%d",
-        ImGuiSliderFlags_AlwaysClamp);
-    ImGui::SetItemTooltip("Oldest messages are dropped once the history exceeds this.");
+    log.setCapacity(static_cast<std::size_t>(maxMessages.get()));
+    log.setLevel(static_cast<spdlog::level::level_enum>(levelFilter.index()));
 }
 
-void OutputConsole::renderMessages(ImVec2 size)
+void OutputConsole::renderToolbar()
 {
-    ImGui::BeginChild(TAG, size, true, ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    FlowLayout layout {FIELD_WIDTH};
+
+    if (layout.button("clear")) {
+        log.clear();
+    }
+
+    layout.field(levelFilter);
+
+    if (layout.button("options")) {
+        ImGui::OpenPopup(OPTIONS_POPUP);
+    }
+
+    renderOptions();
+}
+
+void OutputConsole::renderOptions()
+{
+    if (!ImGui::BeginPopup(OPTIONS_POPUP)) {
+        return;
+    }
+
+    showTimestamps.render();
+    showLevels.render();
+    wrapText.render();
+    autoScroll.render();
+
+    ImGui::SetNextItemWidth(FIELD_WIDTH);
+    maxMessages.render();
+
+    ImGui::EndPopup();
+}
+
+void OutputConsole::renderMessages()
+{
+    ImGui::BeginChild(
+        "messages",
+        ImVec2 {0, 0},
+        ImGuiChildFlags_Borders,
+        ImGuiWindowFlags_AlwaysVerticalScrollbar);
     {
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2 {0, 1});
 
-        if (settings.wrapText) {
-            // Wrapped rows have no fixed height, so every one of them has to be submitted.
-            ImGui::PushTextWrapPos(0.0f);
-            for (int index : visible) {
-                drawMessage(index);
-            }
-
-            ImGui::PopTextWrapPos();
+        if (wrapText.get()) {
+            renderWrapped();
         }
         else {
-            // Uniform line height: only the rows actually on screen get formatted and drawn.
-            ImGuiListClipper clipper;
-            clipper.Begin(static_cast<int>(visible.size()));
-            while (clipper.Step()) {
-                for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
-                    drawMessage(visible[static_cast<std::size_t>(row)]);
-                }
-            }
-
-            clipper.End();
+            renderClipped();
         }
 
         ImGui::PopStyleVar();
 
-        if (settings.autoScroll && (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())) {
+        if (autoScroll.get() && (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())) {
             ImGui::SetScrollHereY(1.0f);
         }
     }
     ImGui::EndChild();
 }
 
-void OutputConsole::drawMessage(int index)
+void OutputConsole::renderClipped()
 {
-    ConsoleMessage const& message = messages[static_cast<std::size_t>(index)];
-    std::string_view      line    = formatMessage(message);
+    ImGuiListClipper clipper;
+    clipper.Begin(static_cast<int>(log.rowCount()));
+
+    while (clipper.Step()) {
+        for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+            drawRow(static_cast<std::size_t>(row));
+        }
+    }
+
+    clipper.End();
+}
+
+void OutputConsole::renderWrapped()
+{
+    std::size_t const count = log.rowCount();
+
+    if (count == 0) {
+        return;
+    }
+
+    float const width  = ImGui::GetContentRegionAvail().x;
+    float const total  = syncRowOffsets(width);
+    float const base   = wrapped.tops.front();
+    float const startY = ImGui::GetCursorPosY();
+
+    auto const above = std::upper_bound(
+        wrapped.tops.begin(),
+        wrapped.tops.end(),
+        base + ImGui::GetScrollY());
+    auto const below = std::lower_bound(
+        above,
+        wrapped.tops.end(),
+        base + ImGui::GetScrollY() + ImGui::GetWindowHeight());
+
+    auto const first = static_cast<std::size_t>(std::distance(wrapped.tops.begin(), above)) - 1;
+    auto const last  = std::min(static_cast<std::size_t>(std::distance(wrapped.tops.begin(), below)), count);
+
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::SetCursorPosY(startY + (wrapped.tops[first] - base));
+
+    for (std::size_t row = first; row < last; ++row) {
+        drawRow(row);
+    }
+
+    ImGui::PopTextWrapPos();
+
+    // The skipped tail still has to be accounted for, or the scroll range collapses.
+    ImGui::SetCursorPosY(startY + total);
+    ImGui::Dummy(ImVec2 {0, 0});
+}
+
+float OutputConsole::syncRowOffsets(float width)
+{
+    std::size_t const count      = log.rowCount();
+    int const         decoration = (showTimestamps.get()? 2 : 0) | (showLevels.get()? 1 : 0);
+
+    // Rows only ever leave from the front, so dropping as many cached offsets keeps the rest
+    // pointing at the rows they were measured from. Everything else invalidates the lot.
+    std::uint64_t const dropped = (log.firstRow() > wrapped.firstRow)? (log.firstRow() - wrapped.firstRow) : 0;
+
+    bool const stale = (wrapped.generation != log.generation())
+                    || (wrapped.width != width)
+                    || (wrapped.decoration != decoration)
+                    || (dropped >= wrapped.tops.size());
+
+    if (stale) {
+        wrapped.tops.assign(1, 0.0f);
+    }
+    else {
+        wrapped.tops.erase(wrapped.tops.begin(), wrapped.tops.begin() + static_cast<std::ptrdiff_t>(dropped));
+    }
+
+    wrapped.width      = width;
+    wrapped.decoration = decoration;
+    wrapped.firstRow   = log.firstRow();
+    wrapped.generation = log.generation();
+
+    float const spacing = ImGui::GetStyle().ItemSpacing.y;
+
+    for (std::size_t row = wrapped.tops.size() - 1; row < count; ++row) {
+        std::string_view const line = formatMessage(log.row(row));
+        float const height = ImGui::CalcTextSize(line.data(), line.data() + line.size(), false, width).y;
+
+        wrapped.tops.push_back(wrapped.tops.back() + height + spacing);
+    }
+
+    return wrapped.tops.back() - wrapped.tops.front();
+}
+
+void OutputConsole::drawRow(std::size_t row)
+{
+    ConsoleMessage const&  message = log.row(row);
+    std::string_view const line    = formatMessage(message);
 
     ImGui::PushStyleColor(ImGuiCol_Text, messageColor(message.level));
     ImGui::TextUnformatted(line.data(), line.data() + line.size());
     ImGui::PopStyleColor();
 }
 
-void OutputConsole::pullNewMessages()
-{
-    sink->drain(messages);
-
-    auto const cap = static_cast<std::size_t>(std::clamp(settings.maxMessages, MIN_MAX_MESSAGES, MAX_MAX_MESSAGES));
-
-    if (messages.size() <= cap) {
-        return;
-    }
-
-    // Drop the oldest entries and shift the cached indices to match.
-    std::size_t const dropped = messages.size() - cap;
-    messages.erase(messages.begin(), messages.begin() + static_cast<std::ptrdiff_t>(dropped));
-
-    auto const shift = static_cast<int>(dropped);
-    auto const first = std::find_if(
-        visible.begin(),
-        visible.end(),
-        [shift] (int index) { return index >= shift; });
-
-    visible.erase(visible.begin(), first);
-    for (int& index : visible) {
-        index -= shift;
-    }
-
-    filteredCount -= std::min(filteredCount, dropped);
-}
-
-void OutputConsole::rebuildFilterIfNeeded()
-{
-    if (filteredLevel != settings.selectedMessageLevel) {
-        filteredLevel = settings.selectedMessageLevel;
-        filteredCount = 0;
-        visible.clear();
-    }
-
-    // Only the messages appended since the last frame need to be classified.
-    for (std::size_t index = filteredCount; index < messages.size(); ++index) {
-        if (messages[index].level >= settings.selectedMessageLevel) {
-            visible.push_back(static_cast<int>(index));
-        }
-    }
-
-    filteredCount = messages.size();
-}
-
 std::string_view OutputConsole::formatMessage(ConsoleMessage const& message)
 {
-    if (!settings.showTimestamps && !settings.showLevels) {
+    if (!showTimestamps.get() && !showLevels.get()) {
         return message.text;
     }
 
     scratch.clear();
-    auto out = std::back_inserter(scratch);
 
-    if (settings.showTimestamps) {
-        auto const time = std::chrono::system_clock::to_time_t(message.timestamp);
-
-        std::tm local_time {};
-#ifdef _WIN32
-        localtime_s(&local_time, &time);
-#else
-        localtime_r(&time, &local_time);
-#endif
-
-        auto const milliseconds =
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-            message.timestamp.time_since_epoch()) %
-            std::chrono::seconds {1};
-
-        fmt::format_to(out, "{:%H:%M:%S}.{:03} ", local_time, milliseconds.count());
+    if (showTimestamps.get()) {
+        TimeUtils::appendLocalTime(scratch, message.timestamp);
+        scratch.push_back(' ');
     }
 
-    if (settings.showLevels) {
-        fmt::format_to(out, "[{}] ", spdlog::level::to_string_view(message.level));
+    if (showLevels.get()) {
+        fmt::format_to(std::back_inserter(scratch), "[{}] ", spdlog::level::to_string_view(message.level));
     }
 
     scratch.append(message.text);

@@ -38,6 +38,7 @@ add_executable(${PROJECT}
     src/app/app.cpp
     src/app/console.cpp
     src/app/settings.cpp
+    src/app/styling.cpp
     src/app/backend/imgui_layer.cpp
     src/app/backend/window.cpp
 
@@ -52,14 +53,16 @@ add_executable(${PROJECT}
     src/renderer/backend/splat_pipeline.cpp
 
     src/utils/bench.cpp
+    src/utils/imgui_utils.cpp
+    src/utils/log_buffer.cpp
     src/utils/logger.cpp
     src/utils/rng.cpp
     src/utils/shader_cache.cpp
+    src/utils/time_utils.cpp
     src/utils/topology.cpp
 
     # Header-only, listed so IDEs and the sdf.inl dependency show up in the target.
     src/logic/behavior/behavior.hpp
-    src/logic/knob.hpp
     src/logic/objects/attractor.hpp
     src/logic/objects/boundary.hpp
     src/logic/objects/emitter.hpp

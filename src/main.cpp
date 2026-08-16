@@ -1,11 +1,14 @@
 ﻿ #define GLM_ENABLE_EXPERIMENTAL
 #include "app/app.hpp"
+#include "utils/console_sink.hpp"
 
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
 #include <filesystem>
+#include <memory>
 #include <system_error>
+#include <utility>
 
 
 /*
@@ -74,8 +77,12 @@ int main()
 {
     spdlog::set_level(spdlog::level::trace);
 
+    // Before anything the console would want to show has had a chance to be logged.
+    auto logSink = std::make_shared<ImGuiConsoleSink>();
+    spdlog::default_logger()->sinks().push_back(logSink);
+
     preferHardwareRenderer();
 
-    App app {"Template Project"};
+    App app {"Template Project", std::move(logSink)};
     app.run();
 }

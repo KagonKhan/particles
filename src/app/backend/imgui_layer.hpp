@@ -3,7 +3,7 @@
 
 #include "utils/bases.hpp"
 
-class Window;
+struct GLFWwindow;
 
 
 // Must outlive nothing and be outlived by the window: the GLFW backend installs callbacks
@@ -11,7 +11,7 @@ class Window;
 class ImGuiLayer : public Immovable<ImGuiLayer>
 {
 public:
-    explicit ImGuiLayer(Window& window);
+    explicit ImGuiLayer(GLFWwindow* window);
     ~ImGuiLayer();
 
     void newFrame();

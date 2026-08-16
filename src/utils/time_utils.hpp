@@ -1,0 +1,17 @@
+#ifndef YARR_UTILS_TIME_UTILS_HPP
+#define YARR_UTILS_TIME_UTILS_HPP
+
+
+#include <chrono>
+#include <string>
+
+namespace TimeUtils
+{
+
+// Appends the local wall-clock time as "HH:MM:SS.mmm". Appends rather than returns, because
+// the callers building a log line already own the buffer it belongs in.
+void appendLocalTime(std::string& out, std::chrono::system_clock::time_point when);
+
+} // namespace TimeUtils
+
+#endif // YARR_UTILS_TIME_UTILS_HPP

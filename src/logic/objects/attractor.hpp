@@ -2,9 +2,9 @@
 #define YARR_LOGIC_ATTRACTOR_HPP
 
 
-#include "logic/knob.hpp"
 #include "logic/particle_pool.hpp"
 #include "logic/scene_object.hpp"
+#include "utils/knob.hpp"
 #include "utils/rng.hpp"
 #include <glm/common.hpp>
 #include <glm/ext/vector_float2.hpp>
@@ -41,11 +41,11 @@ struct Advanced
 {
     Knob<float> strength {"Strength", 1.0F, -5.0F, 5.0F, "%.3f u/s^2 @ 1u"};
     Knob<float> range {
-        "Range", 1.0F, 0.01F, 20.0F, "%.2f u",
+        "Range", 1.0F, 0.01F, 20.0F, "%.2f u", "",
         ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic
     };
     Knob<float> softening {
-        "Softening", 0.2F, 0.01F, 1.0F, "%.3f u",
+        "Softening", 0.2F, 0.01F, 1.0F, "%.3f u", "",
         ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic
     };
 

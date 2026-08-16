@@ -6,22 +6,28 @@
 #include <spdlog/fmt/chrono.h>
 #include <spdlog/spdlog.h>
 
+#include <cmath>
 #include <cstdio>
+#include <utility>
 
 
-App::App(std::string const& title)
-    : window_{2560, 1440, title}
+App::App(std::string const& title, std::shared_ptr<ImGuiConsoleSink> logSink)
+    : window_{2560, 1440, title},
+      console{std::move(logSink)}
 {
+    Settings& settings_ {Settings::getInstance()};
+    settings_.option<bool>("View", "Performance", true);
     settings_.describe("View", "Performance", "The frame and simulation timings panel");
-    settings_.describe("Simulation", "Rate", "How often the simulation steps, independent of the frame rate");
-    settings_.describe("Window", "VSync", "Caps the frame rate to the display. Off while measuring anything.");
 }
 
 void App::run()
 {
     while (!window_.shouldClose()) {
-        const float dt         = clock.sample();
-        auto const  start_time = Time::measure();
+        window_.pollEvents();
+
+        const float dt = clock.sample();
+
+        auto const start_time = Time::measure();
 
         auto const begin_frame_time     = Time::execution(&App::beginFrame, this);
         auto const console_update_time  = Time::execution(&OutputConsole::update, console);
@@ -30,7 +36,7 @@ void App::run()
         auto const render_stats_time    = Time::execution(&App::renderStats, this);
         auto const render_time          = Time::execution(&Renderer::render, renderer_, window_.size(), *scene_, dt);
         auto const console_render_time  = Time::execution(&OutputConsole::render, console);
-        auto const finish_frame_time    = Time::execution(&App::finishFrame, this);
+        auto const finish_frame_time    = Time::execution(&Window::endFrame, window_);
 
         auto const end_time = Time::measure();
 
@@ -49,6 +55,9 @@ void App::run()
 
 void App::stepSimulation(float dt)
 {
+    simulationStepsTaken_ = 0;
+    simulationFellBehind_ = false;
+
     if (simulationRate_.get() == 0) {
         return;
     }
@@ -56,21 +65,21 @@ void App::stepSimulation(float dt)
     float const step = 1.0F / static_cast<float>(simulationRate_.get());
     physicsUpdateAccumulator_ += dt;
 
-    std::size_t updateStep {0};
-    while (physicsUpdateAccumulator_ > 0.0F && updateStep < simulationStepLimit_.get()) {
+    while ((physicsUpdateAccumulator_ >= step) && (simulationStepsTaken_ < simulationStepLimit_.get())) {
         scene_->update(step);
         physicsUpdateAccumulator_ -= step;
-        ++updateStep;
+        ++simulationStepsTaken_;
     }
 
-    if (updateStep >= simulationStepLimit_.get()) {
-        physicsUpdateAccumulator_ = 0.0F;
+    if (physicsUpdateAccumulator_ >= step) {
+        physicsUpdateAccumulator_ = std::fmod(physicsUpdateAccumulator_, step);
+        simulationFellBehind_     = true;
     }
 }
 
 void App::renderStats()
 {
-    if (!showPerformance_.get()) {
+    if (!Settings::getInstance().peek<bool>("View", "Performance")->get()) {
         return;
     }
 
@@ -83,9 +92,15 @@ void App::renderStats()
 
     simulationRate_.render();
     simulationStepLimit_.render();
-    ImGui::SetItemTooltip("How often the simulation steps, independent of the frame rate");
+
+
     if (simulationRate_.get() > 0) {
         ImGui::Text("Step: %.3f ms", 1000.0F / static_cast<float>(simulationRate_.get()));
+        ImGui::Text("Steps: %zu / %zu", simulationStepsTaken_, simulationStepLimit_.get());
+
+        if (simulationFellBehind_) {
+            ImGui::TextColored(ImVec4{1.0F, 0.6F, 0.2F, 1.0F}, "Step limit reached, dropping time");
+        }
     }
 
     ImGui::End();
@@ -93,21 +108,9 @@ void App::renderStats()
 
 void App::beginFrame()
 {
-    window_.pollEvents();
-    window_.clear();
-    window_.setVSync(vsync_.get());
-    imgui_.newFrame();
+    window_.beginFrame();
 
-    settings_.render();
+    Settings::getInstance().render();
 
     ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
-}
-
-void App::finishFrame()
-{
-    auto const [display_w, display_h] = window_.size();
-    glViewport(0, 0, display_w, display_h);
-
-    imgui_.render();
-    window_.swapBuffers();
 }

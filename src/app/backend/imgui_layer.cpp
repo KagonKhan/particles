@@ -1,6 +1,5 @@
 #include "imgui_layer.hpp"
 
-#include "app/backend/window.hpp"
 #include "utils/opengl.hpp"
 
 namespace
@@ -11,7 +10,7 @@ const char* const glsl_version = "#version 440";
 } // namespace
 
 
-ImGuiLayer::ImGuiLayer(Window& window)
+ImGuiLayer::ImGuiLayer(GLFWwindow* window)
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -33,7 +32,7 @@ ImGuiLayer::ImGuiLayer(Window& window)
     }
 
     // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForOpenGL(window.handle(), true);
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 }
 

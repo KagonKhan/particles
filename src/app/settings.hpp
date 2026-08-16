@@ -2,8 +2,8 @@
 #define YARR_APP_SETTINGS_HPP
 
 #include "exceptions.hpp"
-#include "logic/knob.hpp"
 #include "utils/bases.hpp"
+#include "utils/knob.hpp"
 
 #include <memory>
 #include <utility>
