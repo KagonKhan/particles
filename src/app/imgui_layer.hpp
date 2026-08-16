@@ -6,10 +6,8 @@
 class Window;
 
 
-///@brief The Dear ImGui context and its two backends, as one object with one lifetime.
-/// Built after the window and torn down before it: the GLFW backend installs callbacks on
-/// that window, and the OpenGL backend holds GL objects that can only be freed while the
-/// context is still current.
+// Must outlive nothing and be outlived by the window: the GLFW backend installs callbacks
+// on it, and the OpenGL backend frees GL objects that need the context still current.
 class ImGuiLayer : public Immovable<ImGuiLayer>
 {
 public:

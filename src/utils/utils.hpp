@@ -22,7 +22,7 @@ struct Time
         return std::chrono::duration_cast<Duration>(t2 - t1);
     }
 
-    template <typename Duration = std::chrono::milliseconds, typename Fn, typename... Args>
+    template <typename Duration = std::chrono::milliseconds, typename Fn, typename ... Args>
     [[nodiscard]] static auto execution(Fn&& fn, Args&&... args)
     {
         auto const start = measure();
@@ -33,9 +33,34 @@ struct Time
         }
         else {
             auto result = std::invoke(std::forward<Fn>(fn), std::forward<Args>(args)...);
-            return std::pair{std::move(result), duration<Duration>(start, measure())};
+            return std::pair {std::move(result), duration<Duration>(start, measure())};
         }
     }
+};
+
+struct DeltaTimeClock
+{
+    [[nodiscard]] float sample() noexcept
+    {
+        auto  now = Time::measure();
+        float dt  = std::max(
+            1e-6F,
+            static_cast<float>(Time::duration<std::chrono::nanoseconds>(previousFrame, now).count()) / 1e9F);
+
+        previousFrame       = now;
+        smoothedFrameTime_ += (dt - smoothedFrameTime_) * kFrameTimeSmoothing;
+
+        return smoothedFrameTime_;
+    }
+
+    [[nodiscard]] float get() const noexcept { return smoothedFrameTime_; }
+
+private:
+    static constexpr float kFrameTimeSmoothing = 0.05F;
+
+    std::chrono::high_resolution_clock::time_point previousFrame = Time::measure();
+
+    float smoothedFrameTime_ = 1.0F / 60.0F;
 };
 
 [[nodiscard]] [[maybe_unused]]

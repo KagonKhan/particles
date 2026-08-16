@@ -171,9 +171,55 @@ void ShaderCache::unload()
     shaderCache_.clear();
 }
 
-void ShaderCache::loadDefaults()
+GLuint ShaderCache::load(std::string const& name, Shader const& shader)
 {
-// ===   SHADER INITIALIZATION   ===================================================================================
+    GLuint compiled_shader = compileShader(shader);
+
+    if (compiledCache_.contains(name)) {
+        glDeleteShader(compiledCache_[name]);
+    }
+
+    shaderCache_[name]   = shader;
+    compiledCache_[name] = compiled_shader;
+    return compiled_shader;
+}
+
+GLuint ShaderCache::getShader(std::string const& name)
+{
+    if (!compiledCache_.contains(name)) {
+        throw ShaderError("{} shader does not exist", name);
+    }
+
+    return compiledCache_[name];
+}
+
+GLuint ShaderCache::getProgram(std::string const& name)
+{
+    if (!programCache_.contains(name)) {
+        throw ShaderError("{} program does not exist", name);
+    }
+
+    return programCache_[name];
+}
+
+GLuint ShaderCache::compileProgram(std::string const& name, std::initializer_list<GLuint> shaders)
+{
+    if (shaders.size() == 0) {
+        throw ShaderError("{} program compilation requries at least one shader!");
+    }
+
+    GLuint program = createProgram(shaders);
+    if (programCache_.contains(name)) {
+        glDeleteProgram(programCache_[name]);
+    }
+
+    programCache_[name] = program;
+    spdlog::info("Compiled shader program: {}", name);
+    return program;
+}
+
+DefaultShaders::DefaultShaders()
+{
     ShaderCache::compileProgram(
         "PointProgram",
         {
@@ -239,51 +285,4 @@ void ShaderCache::loadDefaults()
                 }),
         }
     );
-}
-
-GLuint ShaderCache::load(std::string const& name, Shader const& shader)
-{
-    GLuint compiled_shader = compileShader(shader);
-
-    if (compiledCache_.contains(name)) {
-        glDeleteShader(compiledCache_[name]);
-    }
-
-    shaderCache_[name]   = shader;
-    compiledCache_[name] = compiled_shader;
-    return compiled_shader;
-}
-
-GLuint ShaderCache::getShader(std::string const& name)
-{
-    if (!compiledCache_.contains(name)) {
-        throw ShaderError("{} shader does not exist", name);
-    }
-
-    return compiledCache_[name];
-}
-
-GLuint ShaderCache::getProgram(std::string const& name)
-{
-    if (!programCache_.contains(name)) {
-        throw ShaderError("{} program does not exist", name);
-    }
-
-    return programCache_[name];
-}
-
-GLuint ShaderCache::compileProgram(std::string const& name, std::initializer_list<GLuint> shaders)
-{
-    if (shaders.size() == 0) {
-        throw ShaderError("{} program compilation requries at least one shader!");
-    }
-
-    GLuint program = createProgram(shaders);
-    if (programCache_.contains(name)) {
-        glDeleteProgram(programCache_[name]);
-    }
-
-    programCache_[name] = program;
-    spdlog::info("Compiled shader program: {}", name);
-    return program;
 }

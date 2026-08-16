@@ -22,7 +22,8 @@ private:
 public:
     OutputConsole();
 
-    void render(ImVec2 size = ImVec2 {0, 0});
+    void update();
+    void render();
 
 private:
     std::shared_ptr<ImGuiConsoleSink> sink {std::make_shared<ImGuiConsoleSink>()};

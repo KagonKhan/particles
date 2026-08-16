@@ -206,7 +206,7 @@ void Renderer::dragEmitter(Scene& scene, glm::mat4 const& viewProj, int w, int h
     scene.placeEmitter({hit.x, hit.y});
 }
 
-void Renderer::render(int width, int height, Scene& scene, float dt)
+void Renderer::render(FramebufferSize size, Scene& scene, float dt)
 {
     renderSettings(dt);
 
@@ -221,7 +221,7 @@ void Renderer::render(int width, int height, Scene& scene, float dt)
 
     shapes_.renderSettings();
 
-    float aspect = (height > 0)? (float)width / (float)height : 1.0F;
+    float aspect = (size.height > 0)? (float)size.width / (float)size.height : 1.0F;
 
     RenderView view = camera_.renderView(aspect);
 
@@ -232,7 +232,7 @@ void Renderer::render(int width, int height, Scene& scene, float dt)
 
     // Before spawning, so a burst dragged across the screen lands under the cursor on the
     // same frame rather than trailing it by one.
-    dragEmitter(scene, view.viewProj, width, height);
+    dragEmitter(scene, view.viewProj, size.width, size.height);
 
     // One upload, whichever pipeline consumes it, then one fence covering its draw.
     particles_.upload(scene.positions());
@@ -241,7 +241,7 @@ void Renderer::render(int width, int height, Scene& scene, float dt)
         points_.draw(particles_, view);
     }
     else {
-        splat_.draw(particles_, view, width, height);
+        splat_.draw(particles_, view, size.width, size.height);
     }
 
     particles_.fence();

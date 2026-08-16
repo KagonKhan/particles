@@ -3,6 +3,10 @@
 
 #include "meta.hpp"
 
+// Teaches the formatter about std::chrono::duration and system_clock time points, so a
+// duration logs as "12ms" instead of needing .count() and a hand-written unit at every
+// call site. Include this header rather than <spdlog/spdlog.h> to get that everywhere.
+#include <spdlog/fmt/chrono.h>
 #include <spdlog/logger.h>
 #include <spdlog/spdlog.h>
 

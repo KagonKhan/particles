@@ -1,30 +1,19 @@
 #include "app.hpp"
 
-#include "utils/opengl.hpp"
+#include "app/console.hpp"
 #include "utils/utils.hpp"
 
+#include <spdlog/fmt/chrono.h>
 #include <spdlog/spdlog.h>
-#include <algorithm>
+
 #include <chrono>
 #include <cstdio>
 
 
-#include "utils/shader_cache.hpp"
-
 namespace
 {
 
-const ImGuiWindowFlags window_flags =
-    ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse |
-    ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-    ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
-    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground
-;
-
-
-constexpr float kFrameTimeSmoothing = 0.05F;
-constexpr int   kMaxStepsPerFrame   = 8;
-constexpr float kBenchmarkUiPeriod  = 0.1F;
+constexpr int kMaxStepsPerFrame = 8;
 
 } // namespace
 
@@ -35,108 +24,46 @@ App::App(std::string const& title)
 
 void App::run()
 {
-    auto previousFrame = Time::measure();
-
     while (!window_.shouldClose()) {
-        auto start_time = Time::measure();
+        const float dt         = clock.sample();
+        auto const  start_time = Time::measure();
 
-        // Floored, so a frame the clock reports as instantaneous cannot divide by zero
-        // in the FPS readout or stall the spawn accumulator.
-        auto  now = Time::measure();
-        float dt  = std::max(
-            1e-6F,
-            static_cast<float>(Time::duration<std::chrono::nanoseconds>(previousFrame, now).count()) / 1e9F);
-        previousFrame       = now;
-        smoothedFrameTime_ += (dt - smoothedFrameTime_) * kFrameTimeSmoothing;
+        auto const begin_frame_time     = Time::execution(&App::beginFrame, this);
+        auto const console_update_time  = Time::execution(&OutputConsole::update, console);
+        auto const step_simulation_time = Time::execution(&App::stepSimulation, this, dt);
+        auto const render_settings_time = Time::execution(&Scene::renderSettings, scene_);
+        auto const render_stats_time    = Time::execution(&App::renderStats, this);
+        auto const render_time          = Time::execution(&Renderer::render, renderer_, window_.size(), *scene_, dt);
+        auto const console_render_time  = Time::execution(&OutputConsole::render, console);
+        auto const finish_frame_time    = Time::execution(&App::finishFrame, this);
 
-        window_.pollEvents();
-        if (window_.iconified()) {
-            ImGui_ImplGlfw_Sleep(10);
-            continue;
-        }
+        auto const end_time = Time::measure();
 
-        // Ahead of the frame, and outside it: the simulation is the thing being measured, and
-        // one that stepped only when something was drawn would be reporting the renderer.
-        spdlog::debug("Simulation step time: {}ms", Time::execution(&App::stepSimulation, this, dt).count());
 
-        // A recording benchmark draws neither the scene nor, for the most part, the interface.
-        // The rasterizer here is llvmpipe — sixteen software threads competing for the sixteen
-        // the simulation is trying to measure — so a million particles drawn between steps
-        // lands in every number the run produces. See docs/performance.md.
-        uiAccumulator_ += dt;
-
-        if (scene_->benchmarking() && (uiAccumulator_ < kBenchmarkUiPeriod)) {
-            // Slept rather than spun, so the one thread left awake is not competing either.
-            ImGui_ImplGlfw_Sleep(1);
-            continue;
-        }
-
-        uiAccumulator_ = 0.0F;
-
-        glClearColor(0.0, 0.0, 0.0, 1.0);
-        // Depth too: the body pass is the one thing that depth tests, and a depth
-        // buffer left over from the previous frame would occlude this frame's bodies.
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        imgui_.newFrame();
-
-        const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(viewport->WorkPos);
-        ImGui::SetNextWindowSize(viewport->WorkSize);
-        ImGui::SetNextWindowViewport(viewport->ID);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        ImGui::Begin("ImGui Template", nullptr, window_flags);
-        ImGui::PopStyleVar(1);
-
-        ImGuiID dockspace_id = ImGui::GetID("RootDockSpace");
-        ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
-
-        spdlog::debug("Scene settings render time: {}ms", Time::execution(&Scene::renderSettings, scene_).count());
-        renderStats();
-
-        // The scene pass is the expensive one — an upload of the whole pool and a million
-        // particles rasterized — and it is the one a run does without entirely.
-        if (!scene_->benchmarking()) {
-            auto const [width, height] = window_.framebufferSize();
-            spdlog::debug(
-                "Rendering time: {}ms",
-                Time::execution(&Renderer::render, renderer_, width, height, *scene_, dt).count());
-        }
-
-        ImGui::Begin("Console Log");
-        console.render();
-        ImGui::End();
-
-        ImGui::End();
-
-        spdlog::debug("Frame finish time: {}ms", Time::execution(&App::finishFrame, this).count());
-
-        auto end_time = Time::measure();
-        spdlog::debug("Full loop timing: {}ms", Time::duration(start_time, end_time).count());
+        spdlog::debug("Begin frame time: {}", begin_frame_time);
+        spdlog::debug("Console update time: {}", console_update_time);
+        spdlog::debug("Step simulation time: {}", step_simulation_time);
+        spdlog::debug("Render settings time: {}", render_settings_time);
+        spdlog::debug("Render stats time: {}", render_stats_time);
+        spdlog::debug("Render time: {}", render_time);
+        spdlog::debug("Console render time: {}", console_render_time);
+        spdlog::debug("Finish frame time: {}", finish_frame_time);
+        spdlog::debug("Full loop timing: {}", Time::duration(start_time, end_time));
     }
 }
 
 void App::stepSimulation(float dt)
 {
-    // Every step is the same length whatever the frame took, so the simulation sees a
-    // steady clock: a hitching frame becomes several steps rather than one enormous one,
-    // and a frame rate far above the simulation rate becomes no step at all.
-    float const step = 1.0F / simulationRate_;
-
-    simulationAccumulator_ += dt;
-
-    stepsLastFrame_ = 0;
-    while ((simulationAccumulator_ >= step) && (stepsLastFrame_ < kMaxStepsPerFrame)) {
-        spdlog::debug("Scene update time: {}ms", Time::execution(&Scene::update, scene_, step).count());
-        simulationAccumulator_ -= step;
-        ++stepsLastFrame_;
+    if (simulationRate_.get() == 0) {
+        return;
     }
 
-    // Only reachable by hitting the ceiling above. Keeping the backlog would spend every
-    // later frame at the cap trying to work off time it can never make up, so the
-    // simulation drops it and falls behind the wall clock instead.
-    if (simulationAccumulator_ >= step) {
-        simulationAccumulator_ = 0.0F;
+    float const step = 1.0F / static_cast<float>(simulationRate_.get());
+    physicsUpdateAccumulator_ += dt;
+
+    while (physicsUpdateAccumulator_ > 0.0F) {
+        scene_->update(step);
+        physicsUpdateAccumulator_ -= step;
     }
 }
 
@@ -144,15 +71,14 @@ void App::renderStats()
 {
     ImGui::Begin("Performance");
 
-    ImGui::Text("FPS: %.1f", 1.0F / smoothedFrameTime_);
-    ImGui::Text("Frame: %.3f ms", smoothedFrameTime_ * 1000.0F);
+    ImGui::Text("FPS: %.1f", 1.0F / clock.get());
+    ImGui::Text("Frame: %.3f ms", clock.get() * 1000.0F);
 
     ImGui::SeparatorText("Simulation");
 
-    ImGui::SliderFloat("Rate", &simulationRate_, 1.0F, 480.0F, "%.0f Hz", ImGuiSliderFlags_AlwaysClamp);
+    simulationRate_.render();
     ImGui::SetItemTooltip("How often the simulation steps, independent of the frame rate");
-    ImGui::Text("Step: %.3f ms", 1000.0F / simulationRate_);
-    ImGui::Text("Steps this frame: %d", stepsLastFrame_);
+    ImGui::Text("Step: %.3f ms", 1000.0F / (float)simulationRate_.get());
 
     // The window will look frozen while this is up, which is the point rather than a fault.
     if (scene_->benchmarking()) {
@@ -167,9 +93,18 @@ void App::renderStats()
     ImGui::End();
 }
 
+void App::beginFrame()
+{
+    window_.pollEvents();
+    window_.clear();
+    imgui_.newFrame();
+
+    ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+}
+
 void App::finishFrame()
 {
-    auto const [display_w, display_h] = window_.framebufferSize();
+    auto const [display_w, display_h] = window_.size();
     glViewport(0, 0, display_w, display_h);
 
     imgui_.render();

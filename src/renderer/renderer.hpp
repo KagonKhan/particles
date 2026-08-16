@@ -1,6 +1,7 @@
 #ifndef YARR_RENDERER_HPP
 #define YARR_RENDERER_HPP
 
+#include "app/window.hpp"
 #include "logic/camera.hpp"
 #include "renderer/particle_buffer.hpp"
 #include "renderer/point_pipeline.hpp"
@@ -25,14 +26,14 @@ enum class RenderMode : std::uint8_t
 class Renderer
 {
 public:
-    Renderer() { ShaderCache::loadDefaults(); }
-    ///@brief Draws one frame into a framebuffer of the given size. The size is passed in
-    /// rather than queried, so nothing here has to know what kind of window it came from.
-    void render(int width, int height, Scene& scene, float dt);
+    void render(FramebufferSize size, Scene& scene, float dt);
 
 private:
     void renderSettings(float dt);
     void dragEmitter(Scene& scene, glm::mat4 const& viewProj, int w, int h);
+
+    // First, and deliberately: every pipeline below looks its program up in its constructor.
+    DefaultShaders shaders_;
 
     Camera     camera_;
     RenderMode mode_ {RenderMode::Points};

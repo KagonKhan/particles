@@ -2,6 +2,7 @@
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>
+#include <imgui.h>
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <array>
@@ -53,16 +54,21 @@ OutputConsole::OutputConsole()
     visible.reserve(static_cast<std::size_t>(settings.maxMessages));
 }
 
-void OutputConsole::render(ImVec2 size)
+void OutputConsole::update()
 {
+    pullNewMessages();
+    rebuildFilterIfNeeded();
+}
+
+void OutputConsole::render()
+{
+    ImGui::Begin("Console Log");
     ImGui::SeparatorText("Console");
 
     renderToolbar();
+    renderMessages(ImVec2{0, 0});
 
-    pullNewMessages();
-    rebuildFilterIfNeeded();
-
-    renderMessages(size);
+    ImGui::End();
 }
 
 void OutputConsole::renderToolbar()

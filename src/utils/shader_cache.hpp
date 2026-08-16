@@ -22,8 +22,6 @@ public:
     ///@brief clears the shader cache
     static void unload();
 
-    ///@brief load all programs
-    static void loadDefaults();
     ///@brief compiles a shader and returns the handle. Overwrites if exists
     static GLuint load(std::string const& name, Shader const& shader);
     ///@brief compiles a program and returns the handle. Requires at least one shader.
@@ -38,6 +36,17 @@ private:
     inline static std::unordered_map<std::string, Shader> shaderCache_; // TODO: remove later and introduce some shader-identity
     inline static std::unordered_map<std::string, GLuint> compiledCache_;
     inline static std::unordered_map<std::string, GLuint> programCache_;
+};
+
+struct DefaultShaders : public Immovable<DefaultShaders>
+{
+    DefaultShaders();
+    ~DefaultShaders() { ShaderCache::unload(); }
+
+    DefaultShaders(const DefaultShaders&)             = delete;
+    DefaultShaders(DefaultShaders&&)                  = delete;
+    DefaultShaders &operator =(const DefaultShaders&) = delete;
+    DefaultShaders &operator =(DefaultShaders&&)      = delete;
 };
 
 
