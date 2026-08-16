@@ -38,6 +38,7 @@ add_executable(${PROJECT}
     src/app/app.cpp
     src/app/console.cpp
     src/app/imgui_layer.cpp
+    src/app/settings.cpp
     src/app/window.cpp
 
     src/emitter/emitter.cpp

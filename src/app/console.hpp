@@ -2,6 +2,7 @@
 #define YARR_APP_CONSOLE_HPP
 
 
+#include "app/settings.hpp"
 #include "logic/console_sink.hpp"
 #include <imgui.h>
 #include <cstddef>
@@ -26,6 +27,10 @@ public:
     void render();
 
 private:
+    // Only the drawing is optional: messages keep arriving and ageing out while the panel
+    // is hidden, so turning it back on shows the log as it stands rather than as it was.
+    Knob<bool>& visible_ {Settings::getInstance().option<bool>("View", "Console", true)};
+
     std::shared_ptr<ImGuiConsoleSink> sink {std::make_shared<ImGuiConsoleSink>()};
 
     std::vector<ConsoleMessage> messages;

@@ -49,6 +49,8 @@ float labeledItemWidth(float itemWidth, char const* label)
 
 OutputConsole::OutputConsole()
 {
+    Settings::getInstance().describe("View", "Console", "The log panel. Messages keep arriving while it is hidden.");
+
     spdlog::default_logger()->sinks().push_back(sink);
     messages.reserve(static_cast<std::size_t>(settings.maxMessages));
     visible.reserve(static_cast<std::size_t>(settings.maxMessages));
@@ -62,6 +64,10 @@ void OutputConsole::update()
 
 void OutputConsole::render()
 {
+    if (!visible_.get()) {
+        return;
+    }
+
     ImGui::Begin("Console Log");
     ImGui::SeparatorText("Console");
 

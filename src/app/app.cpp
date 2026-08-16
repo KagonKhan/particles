@@ -6,21 +6,16 @@
 #include <spdlog/fmt/chrono.h>
 #include <spdlog/spdlog.h>
 
-#include <chrono>
 #include <cstdio>
-
-
-namespace
-{
-
-constexpr int kMaxStepsPerFrame = 8;
-
-} // namespace
 
 
 App::App(std::string const& title)
     : window_{2560, 1440, title}
-{}
+{
+    settings_.describe("View", "Performance", "The frame and simulation timings panel");
+    settings_.describe("Simulation", "Rate", "How often the simulation steps, independent of the frame rate");
+    settings_.describe("Window", "VSync", "Caps the frame rate to the display. Off while measuring anything.");
+}
 
 void App::run()
 {
@@ -69,6 +64,10 @@ void App::stepSimulation(float dt)
 
 void App::renderStats()
 {
+    if (!showPerformance_.get()) {
+        return;
+    }
+
     ImGui::Begin("Performance");
 
     ImGui::Text("FPS: %.1f", 1.0F / clock.get());
@@ -79,17 +78,6 @@ void App::renderStats()
     simulationRate_.render();
     ImGui::SetItemTooltip("How often the simulation steps, independent of the frame rate");
     ImGui::Text("Step: %.3f ms", 1000.0F / (float)simulationRate_.get());
-
-    // The window will look frozen while this is up, which is the point rather than a fault.
-    if (scene_->benchmarking()) {
-        ImGui::SeparatorText("Benchmark");
-        ImGui::TextColored(ImVec4 {1.0F, 0.8F, 0.3F, 1.0F}, "Recording — scene rendering paused");
-        ImGui::SetItemTooltip(
-            "The scene pass is skipped and the interface is drawn ten times a second, so the "
-            "rasterizer is not competing with the simulation for cores. The frame readout above "
-            "does not mean anything until the run ends.");
-    }
-
     ImGui::End();
 }
 
@@ -97,7 +85,10 @@ void App::beginFrame()
 {
     window_.pollEvents();
     window_.clear();
+    window_.setVSync(vsync_.get());
     imgui_.newFrame();
+
+    settings_.render();
 
     ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 }

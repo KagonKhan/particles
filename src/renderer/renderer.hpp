@@ -1,6 +1,7 @@
 #ifndef YARR_RENDERER_HPP
 #define YARR_RENDERER_HPP
 
+#include "app/settings.hpp"
 #include "app/window.hpp"
 #include "logic/camera.hpp"
 #include "renderer/particle_buffer.hpp"
@@ -30,6 +31,7 @@ public:
 
 private:
     void renderSettings(float dt);
+    void renderCameraPanel();
     void dragEmitter(Scene& scene, glm::mat4 const& viewProj, int w, int h);
 
     // First, and deliberately: every pipeline below looks its program up in its constructor.
@@ -54,6 +56,11 @@ private:
     // Latched on the right-button press, so a look that drags across a panel is not cut
     // short by ImGui claiming the mouse partway through.
     bool mouseLooking_ {false};
+
+    // Only the panels. Camera input keeps running with them hidden, so flying the view
+    // around does not depend on anything being on screen.
+    Knob<bool>& showRenderer_ {Settings::getInstance().option<bool>("View", "Renderer", true)};
+    Knob<bool>& showCamera_ {Settings::getInstance().option<bool>("View", "Camera", true)};
 };
 
 #endif // YARR_RENDERER_HPP

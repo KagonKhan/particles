@@ -67,9 +67,23 @@ public:
     void pollEvents() const noexcept  { glfwPollEvents(); }
     void swapBuffers() const noexcept { glfwSwapBuffers(window_.get()); }
 
+    // Idempotent, so a caller holding a setting can hand it over every frame without
+    // paying for a driver call it does not need.
+    void setVSync(bool enabled) noexcept
+    {
+        if (enabled == vsync_) {
+            return;
+        }
+
+        vsync_ = enabled;
+        glfwSwapInterval(enabled? 1 : 0);
+    }
+
 private:
     GlfwLibrary  glfw_;
     WindowHandle window_;
+
+    bool vsync_ {false};
 };
 
 #endif // YARR_APP_WINDOW_HPP

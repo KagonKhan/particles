@@ -22,21 +22,11 @@ constexpr float kTwoPi           = 2.0F * std::numbers::pi_v<float>;
 
 } // namespace
 
-void Renderer::renderSettings(float dt)
+void Renderer::renderCameraPanel()
 {
-    ImGui::Begin("Renderer");
-
-    ImGui::SeparatorText("Mode");
-
-    int mode = static_cast<int>(mode_);
-    ImGui::RadioButton("Points", &mode, static_cast<int>(RenderMode::Points));
-    ImGui::SetItemTooltip("One GL_POINTS draw. Simple, and what to use while working on the simulation.");
-    ImGui::SameLine();
-    ImGui::RadioButton("Splat", &mode, static_cast<int>(RenderMode::Splat));
-    ImGui::SetItemTooltip("Compute-accumulated density. Survives counts the point rasterizer will not.");
-    mode_ = static_cast<RenderMode>(mode);
-
-    ImGui::End();
+    if (!showCamera_.get()) {
+        return;
+    }
 
     ImGui::Begin("Camera");
 
@@ -100,6 +90,27 @@ void Renderer::renderSettings(float dt)
     ImGui::TextDisabled("WASD flies, right-drag or Q/E looks, Shift for speed");
     ImGui::TextDisabled("Left-drag moves the emitter across the plane");
     ImGui::End();
+}
+
+void Renderer::renderSettings(float dt)
+{
+    if (showRenderer_.get()) {
+        ImGui::Begin("Renderer");
+
+        ImGui::SeparatorText("Mode");
+
+        int mode = static_cast<int>(mode_);
+        ImGui::RadioButton("Points", &mode, static_cast<int>(RenderMode::Points));
+        ImGui::SetItemTooltip("One GL_POINTS draw. Simple, and what to use while working on the simulation.");
+        ImGui::SameLine();
+        ImGui::RadioButton("Splat", &mode, static_cast<int>(RenderMode::Splat));
+        ImGui::SetItemTooltip("Compute-accumulated density. Survives counts the point rasterizer will not.");
+        mode_ = static_cast<RenderMode>(mode);
+
+        ImGui::End();
+    }
+
+    renderCameraPanel();
 
     if (autoTurn_) {
         camera_.yaw += dt * 0.4F;
