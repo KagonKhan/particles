@@ -30,19 +30,17 @@ public:
         : sink_{std::move(log_sink)}
     {}
 
-
     void update();
     void render();
 
 private:
     std::shared_ptr<ImGuiConsoleSink> sink_;
+    LogBuffer                         logBuffer_;
+    std::string                       scratchPad_;
+    float                             contentWidth_ {0.0F};
+    bool                              stickToBottom_ {true};
 
-    LogBuffer   log_;
-    std::string scratch_;
-
-    // Wrapped rows have no height in common, which is the one thing ImGuiListClipper needs.
-    // These are the running vertical offsets of every row, measured once per row and reused
-    // until something invalidates them, so the rows can be clipped by hand instead.
+    // Row height calculations
     struct RowOffsets
     {
         std::deque<float> tops {0.0f};
@@ -67,20 +65,17 @@ private:
     Knob<bool>        showTimestamps_ {"Timestamps", false};
     Knob<bool>        showLevels_ {"Levels", false};
     Knob<bool>        wrapText_ {"Wrap", false};
-    Knob<bool>        autoScroll_ {"Auto-scroll", true};
 
 
     void applySettings();
 
     void renderToolbar();
-    void renderOptions();
     void renderMessages();
-    void renderWrapped();
-    void renderClipped();
     void drawRow(std::size_t row);
 
     [[nodiscard]] std::string_view formatMessage(ConsoleMessage const& message);
     [[nodiscard]] float            syncRowOffsets(float width);
+    [[nodiscard]] float            measureContent(std::size_t count);
 };
 
 #endif // YARR_APP_CONSOLE_HPP

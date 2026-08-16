@@ -3,30 +3,16 @@
 #include <imgui.h>
 #include <spdlog/spdlog.h>
 
+#include <memory>
 #include <string_view>
 
 
 namespace
 {
 
-// In font sizes. A menu fits itself to what is in it, and a slider left to its own devices
-// asks for the width of the window it is in, which between them size nothing sensibly.
 constexpr float ITEM_WIDTH = 9.0F;
 
 } // namespace
-
-
-void Settings::describe(char const* menu, char const* name, char const* tooltip)
-{
-    Entry* const entry = findEntry(menu, name);
-
-    if (entry == nullptr) {
-        spdlog::warn("No setting \"{}/{}\" to describe", menu, name);
-        return;
-    }
-
-    entry->tooltip = tooltip;
-}
 
 void Settings::render()
 {
@@ -39,13 +25,9 @@ void Settings::render()
             continue;
         }
 
-        for (Entry& entry : menu.entries) {
+        for (std::unique_ptr<KnobBase> const& knob : menu.knobs) {
             ImGui::SetNextItemWidth(ImGui::GetFontSize() * ITEM_WIDTH);
-            entry.knob->render();
-
-            if (entry.tooltip != nullptr) {
-                ImGui::SetItemTooltip("%s", entry.tooltip);
-            }
+            knob->render();
         }
 
         ImGui::EndMenu();
@@ -54,32 +36,19 @@ void Settings::render()
     ImGui::EndMainMenuBar();
 }
 
-Settings::Entry* Settings::findEntry(char const* menu, char const* name)
+KnobBase* Settings::findKnob(char const* menu, char const* name)
 {
     for (Menu& candidate : menus_) {
         if (std::string_view {candidate.name} != menu) {
             continue;
         }
 
-        for (Entry& entry : candidate.entries) {
-            if (std::string_view {entry.knob->name()} == name) {
-                return &entry;
+        for (std::unique_ptr<KnobBase> const& knob : candidate.knobs) {
+            if (std::string_view {knob->name()} == name) {
+                return knob.get();
             }
         }
     }
 
     return nullptr;
-}
-
-std::vector<Settings::Entry>& Settings::entriesOf(char const* menu)
-{
-    for (Menu& candidate : menus_) {
-        if (std::string_view {candidate.name} == menu) {
-            return candidate.entries;
-        }
-    }
-
-    menus_.push_back(Menu {menu, {}});
-
-    return menus_.back().entries;
 }

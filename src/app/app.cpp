@@ -15,9 +15,7 @@ App::App(std::string const& title, std::shared_ptr<ImGuiConsoleSink> log_sink)
     : window_{2560, 1440, title},
       console_{std::move(log_sink)}
 {
-    Settings& settings {Settings::getInstance()};
-    settings.option<bool>("View", "Performance", true);
-    settings.describe("View", "Performance", "The frame and simulation timings panel");
+    Settings::getInstance().option<bool>("View", "Performance", true, "The frame and simulation timings panel");
 }
 
 void App::run()
