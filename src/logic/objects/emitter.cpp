@@ -10,8 +10,6 @@ void Emitter::spawn(ParticlePool& pool, float dt)
     }
 
     spawnAccumulator_ += emittingSettings_.spawnRate * dt;
-    // Against the user's cap, not the pool's: clamping to MAX_PARTICLES let a single frame
-    // overshoot whatever limit had been dialled in.
     int to_spawn = std::min(
         static_cast<int>(emittingSettings_.maxParticles) - static_cast<int>(pool.aliveCount),
         static_cast<int>(spawnAccumulator_));
@@ -35,10 +33,6 @@ void Emitter::spawn(ParticlePool& pool, float dt)
     }
 }
 
-// Kept out of the scene's fused pass and given one of its own: it is the pool's shape that
-// changes here, not the particles, and a chunk cannot pull a replacement in from a tail that
-// belongs to some other chunk. It reads the ages, which the fused pass never touches, and
-// writes only where something has actually died.
 void Emitter::reap(ParticlePool& pool, float dt)
 {
     std::size_t i = 0;

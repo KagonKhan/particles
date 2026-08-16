@@ -16,6 +16,7 @@
 #include <cstdint>
 
 class Scene;
+class Simulation;
 
 enum class RenderMode : std::uint8_t
 {
@@ -26,7 +27,7 @@ enum class RenderMode : std::uint8_t
 class Renderer
 {
 public:
-    void render(FramebufferSize size, Scene& scene, float dt);
+    void render(FramebufferSize size, Simulation& simulation, float dt);
 
 private:
     void renderSettings(float dt);

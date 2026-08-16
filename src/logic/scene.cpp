@@ -11,11 +11,6 @@
 #ifdef PARTICLES_HAVE_TBB
     #include <execution>
 
-// libstdc++ chooses its parallel backend from `__has_include(<tbb/tbb.h>)` at the point
-// <execution> is parsed, so linking TBB is not by itself enough — its headers have to be
-// on the include path here too. Where they are not, every execution policy silently
-// degrades to serial, which is exactly the result this toggle exists to distinguish
-// from. Better to refuse to build than to ship a checkbox that does nothing.
     #if defined(__GLIBCXX__) && !defined(_PSTL_PAR_BACKEND_TBB)
         #error "TBB is linked but <execution> selected its serial backend — TBB's headers are not on the include path"
     #endif
@@ -36,17 +31,6 @@ void integrate(ParticleChunk chunk, float dt)
 
 } // namespace
 
-// One pass over the pool per frame instead of one per object. Sweeping it once per object
-// made every object pay to pull the same particles back in, and the cost grew with the scene
-// rather than with the physics. Sliced into chunks, a particle is read in once and every
-// object has its say while it is still in cache.
-//
-// Objects are applied in the order they are written here, and that order is the physics:
-// forces first, then the step they produce, then the surfaces that correct it. Bouncing
-// before integrating would resolve last step's contact and hand the result straight back.
-//
-// Chunks are independent by construction — an object may only touch the particles it was
-// handed — so running them across threads needs no more than saying so.
 void Scene::update(float dt)
 {
     elapsed_ += dt;
@@ -66,7 +50,6 @@ void Scene::update(float dt)
     auto const step = [this, dt] (ParticleChunk chunk) {
             attractor_->apply(chunk, dt);
             integrate(chunk, dt);
-            // boundary_->apply(chunk);
         };
 
 #ifdef PARTICLES_HAVE_TBB
@@ -95,7 +78,6 @@ void Scene::renderSettings()
 {
     emitter_->renderSettings(*pool_);
     attractor_->renderSettings();
-    // boundary_->renderSettings();
 
     renderTuning();
 }

@@ -13,8 +13,6 @@
 #include <cstddef>
 #include <variant>
 
-// How far off the surface a resolved particle is left. Landing it exactly on the outline
-// lets rounding put it back inside, and it would spend every frame being pushed out again.
 constexpr float CONTACT_SKIN = 1e-4F;
 
 
@@ -24,10 +22,6 @@ public:
     Behavior()          = default;
     virtual ~Behavior() = default;
 
-    // A chunk rather than the pool, so the scene can hand the same slice to every object
-    // while it is still in cache. One virtual call per chunk — a thousandth of what calling
-    // through this interface per particle would cost, and it buys back the dynamic
-    // behavior list this is an interface for.
     virtual void apply(ParticleChunk chunk, SceneObject const& object) const = 0;
     virtual void renderKnobs()                                               = 0;
 
@@ -40,12 +34,6 @@ protected:
 
 struct Bounce : public Behavior
 {
-    // The object arrives per call rather than in the constructor, so one behavior can serve
-    // every body in the scene and a shape dragged on its sliders takes effect that frame.
-    //
-    // The variant is opened once for the whole chunk, not once per particle: with the
-    // alternative in hand the field and its gradient inline into the loop below, and the
-    // broad phase there is a couple of compares rather than a call through the variant.
     void apply(ParticleChunk chunk, SceneObject const& object) const override
     {
         std::visit(
@@ -57,24 +45,16 @@ struct Bounce : public Behavior
     {
         ImGui::SeparatorText("Bouncing");
         bounceFactor_.render();
-        friction_.render();
-        restThreshold_.render();
     }
 
 private:
     template <typename ShapeT>
     void resolve(ShapeT shape, ParticleChunk chunk, glm::vec2 origin) const
     {
-        float const restitution = bounceFactor_.get();
-        float const slide       = 1.0F - friction_.get();
-        float const rest        = restThreshold_.get();
-
         for (std::size_t i {}; i < chunk.size(); ++i) {
             glm::vec2&      position = chunk.positions[i];
             glm::vec2 const local    = position - origin;
 
-            // Most of a pool is nowhere near any one body on any one frame, and this is what
-            // those particles cost — no square root, no gradient, no contact built.
             if (!mayContact(shape, local, CONTACT_SKIN)) {
                 continue;
             }
@@ -86,34 +66,19 @@ private:
             }
 
             glm::vec2& velocity = chunk.velocities[i];
-
             position += hit.normal * (CONTACT_SKIN - hit.distance);
-
             float const approach = glm::dot(velocity, hit.normal);
 
-            // Already on its way out — reflecting it again is what makes particles buzz
-            // against a surface instead of leaving it.
             if (approach >= 0.0F) {
                 continue;
             }
 
-            // Split at the normal so the two halves of a contact stay independent:
-            // restitution decides how much of the impact comes back, friction how much of
-            // the slide across the surface survives it.
             glm::vec2 const tangential = velocity - (approach * hit.normal);
-            float const     rebound    = (-approach > rest)? -approach * restitution : 0.0F;
-
-            velocity = (tangential * slide) + (hit.normal * rebound);
+            velocity = tangential - (approach * bounceFactor_.get()) * hit.normal;
         }
     }
 
-    Knob<float> bounceFactor_ {"Bounce Factor", 1.0F, 0.0F, 5.0F, "%.3f"};
-    Knob<float> friction_ {"Friction", 0.0F, 0.0F, 1.0F, "%.3f"};
-
-    // Under this much approach speed a particle is taken as resting and only slides. Left
-    // to bounce it trades a fraction of a millimetre back and forth forever, which reads as
-    // a shimmering line of particles along every surface.
-    Knob<float> restThreshold_ {"Rest threshold", 0.05F, 0.0F, 1.0F, "%.3f u/s"};
+    Knob<float> bounceFactor_ {"Bounce Factor", 1.0F, 0.0F, 2.0F, "%.3f"};
 
     // TODO: scatter, to make a surface diffuse rather than a mirror. Wants an RNG, and
     // update() is const, so it waits on whether a behavior is allowed state.

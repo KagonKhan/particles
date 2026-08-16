@@ -4,7 +4,7 @@
 #include "app/backend/window.hpp"
 #include "app/console.hpp"
 #include "app/settings.hpp"
-#include "logic/scene.hpp"
+#include "logic/simulation.hpp"
 #include "renderer/renderer.hpp"
 #include "utils/bases.hpp"
 #include "utils/knob.hpp"
@@ -24,29 +24,23 @@ public:
 private:
     void beginFrame();
 
-    void stepSimulation(float dt);
+    void renderSceneSettings();
     void renderStats();
 
     Window window_;
 
-    std::unique_ptr<Renderer> renderer_ {new Renderer};
-    std::unique_ptr<Scene>    scene_ {new Scene};
-    DeltaTimeClock            clock_;
-
-    Knob<int> simulationRate_ {
-        "Simulation Rate", 120, 0, 480, "%d Hz",
-        "How often the simulation steps, independent of the frame rate"
-    };
-    Knob<std::size_t> simulationStepLimit_ {
-        "Simulation Step Limit", 8, 1, 16, "%zu steps",
-        "Most steps one frame may take. Holding real time needs rate / FPS of them;\nbelow that the simulation runs slow rather than stalling the interface."
-    };
+    std::unique_ptr<Renderer>   renderer_ {new Renderer};
+    std::unique_ptr<Simulation> simulation_ {new Simulation};
+    DeltaTimeClock              clock_;
 
     OutputConsole console_;
 
-    float       physicsUpdateAccumulator_ = 0.0F;
-    std::size_t simulationStepsTaken_     = 0;
-    bool        simulationFellBehind_     = false;
+    Knob<bool>& performanceVisible_ {Settings::getInstance().option<bool>(
+                                         "View",
+                                         "Performance",
+                                         true,
+                                         "The frame and simulation timings panel")
+    };
 };
 
 #endif

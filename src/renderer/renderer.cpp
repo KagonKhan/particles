@@ -1,6 +1,7 @@
 #include "renderer.hpp"
 
 #include "logic/scene.hpp"
+#include "logic/simulation.hpp"
 
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
@@ -217,7 +218,7 @@ void Renderer::dragEmitter(Scene& scene, glm::mat4 const& view_proj, int w, int 
     scene.placeEmitter({hit.x, hit.y});
 }
 
-void Renderer::render(FramebufferSize size, Scene& scene, float dt)
+void Renderer::render(FramebufferSize size, Simulation& simulation, float dt)
 {
     renderSettings(dt);
 
@@ -236,17 +237,30 @@ void Renderer::render(FramebufferSize size, Scene& scene, float dt)
 
     RenderView view = camera_.renderView(aspect);
 
+    // Outside the borrow below: this is the part of streaming that can block on the GPU, and
+    // the simulation thread is not going to wait on a frame that has not finished drawing.
+    particles_.acquire();
+
+    // The one window this frame needs the simulation itself, kept to the three things that
+    // cannot be done without it. Everything after is this frame's own copy.
+    std::vector<SceneObject> objects;
+
+    {
+        auto scene = simulation.borrow();
+
+        // Before the copy, so a body dragged across the screen is drawn under the cursor on
+        // the same frame rather than trailing it by one.
+        dragEmitter(*scene, view.viewProj, size.width, size.height);
+
+        objects = scene->getSceneObjects();
+
+        // One upload, whichever pipeline consumes it, then one fence covering its draw.
+        particles_.upload(scene->positions());
+    }
+
     // Bodies first: they are the only opaque thing here, so they lay down the depth the
     // particles are then blended over.
-    std::vector<SceneObject const*> objects = scene.getSceneObjects();
     shapes_.draw(objects, view);
-
-    // Before spawning, so a burst dragged across the screen lands under the cursor on the
-    // same frame rather than trailing it by one.
-    dragEmitter(scene, view.viewProj, size.width, size.height);
-
-    // One upload, whichever pipeline consumes it, then one fence covering its draw.
-    particles_.upload(scene.positions());
 
     if (mode_ == RenderMode::POINTS) {
         points_.draw(particles_, view);

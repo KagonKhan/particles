@@ -30,7 +30,7 @@ public:
     ShapePipeline(ShapePipeline&&)                 = delete;
     ShapePipeline& operator=(ShapePipeline&&)      = delete;
 
-    void draw(std::span<SceneObject const* const> objects, RenderView const& view);
+    void draw(std::span<SceneObject const> objects, RenderView const& view);
 
     void renderSettings();
 

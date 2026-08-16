@@ -10,29 +10,21 @@
 #include <cstddef>
 
 
-// The pool arrives per call rather than being held: the scene owns the particles, and an
-// emitter is only one of the things allowed to write into them.
 class Emitter
 {
 public:
     void spawn(ParticlePool& pool, float dt);
-
-    // Ages the pool and removes what has expired. Structural, so it belongs to the emitter
-    // that set the lifetime rather than to a scene object acting on particles.
     void reap(ParticlePool& pool, float dt);
 
     void renderSettings(ParticlePool& pool);
 
-    // Whether the simulation is advancing. The scene owns the decision to skip a step, so
-    // that everything acting on the pool is paused together rather than each in isolation.
-    [[nodiscard]] bool               isEnabled() const noexcept { return emittingSettings_.enabled; }
-    [[nodiscard]] bool               isVisible() const noexcept { return object_.visible; }
-    [[nodiscard]] SceneObject const& object() const noexcept    { return object_; }
+    void                             setPosition(glm::vec2 position) noexcept { object_.transform.position = position; }
+    [[nodiscard]] bool               isEnabled() const noexcept               { return emittingSettings_.enabled; }
+    [[nodiscard]] bool               isVisible() const noexcept               { return object_.visible; }
+    [[nodiscard]] SceneObject const& object() const noexcept                  { return object_; }
 
-    void setPosition(glm::vec2 position) noexcept { object_.transform.position = position; }
 
 private:
-
     struct EmittingSettings
     {
         bool enabled             = {true};

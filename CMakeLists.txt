@@ -29,6 +29,10 @@ find_package(nlohmann_json REQUIRED)
 # than the silent serial fallback libstdc++ gives you for a <execution> that links no backend.
 find_package(TBB QUIET)
 
+# The simulation runs on its own thread, so this is required rather than inherited from
+# whatever TBB happens to pull in.
+find_package(Threads REQUIRED)
+
 
 
 # === PROJECT ==========================================================================================================
@@ -43,6 +47,7 @@ add_executable(${PROJECT}
     src/app/backend/window.cpp
 
     src/logic/scene.cpp
+    src/logic/simulation.cpp
     src/logic/objects/emitter.cpp
 
     src/renderer/camera.cpp
@@ -64,12 +69,12 @@ add_executable(${PROJECT}
     # Header-only, listed so IDEs and the sdf.inl dependency show up in the target.
     src/logic/behavior/behavior.hpp
     src/logic/objects/attractor.hpp
-    src/logic/objects/boundary.hpp
     src/logic/objects/emitter.hpp
     src/logic/particle_pool.hpp
     src/logic/scene_object.hpp
     src/logic/sdf.hpp
     src/logic/shape.hpp
+    src/logic/simulation.hpp
     resources/shaders/sdf.inl
 )
 
@@ -88,6 +93,7 @@ target_link_libraries(${PROJECT} PUBLIC
     stb::stb
     spdlog::spdlog
     nlohmann_json::nlohmann_json
+    Threads::Threads
     none
 )
 

@@ -6,22 +6,41 @@
 #include <spdlog/fmt/chrono.h>
 #include <spdlog/spdlog.h>
 
-#include <cmath>
-#include <cstdio>
+#include <chrono>
+#include <thread>
 #include <utility>
 
+
+namespace
+{
+
+// Frames past this buy nothing on a 60 Hz display, and every one of them is contended memory
+// bandwidth and a core the simulation could have had instead. Its own thread means capping
+// here costs the simulation nothing — the two rates are unrelated now.
+constexpr auto FRAME_PERIOD = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+    std::chrono::duration<double> {1.0 / 60.0});
+
+} // namespace
 
 App::App(std::string const& title, std::shared_ptr<ImGuiConsoleSink> log_sink)
     : window_{2560, 1440, title},
       console_{std::move(log_sink)}
-{
-    Settings::getInstance().option<bool>("View", "Performance", true, "The frame and simulation timings panel");
-}
+{}
 
 void App::run()
 {
+    auto next_frame = std::chrono::steady_clock::now();
+
     while (!window_.shouldClose()) {
         window_.pollEvents();
+
+        // Minimised, the framebuffer is 0x0: there is nothing to draw into and no reason to spin.
+        // The clock is reset rather than sampled so the idle stretch never reaches the average.
+        if (window_.iconified()) {
+            window_.waitEvents();
+            clock_.reset();
+            continue;
+        }
 
         const float dt = clock_.sample();
 
@@ -29,55 +48,53 @@ void App::run()
 
         auto const begin_frame_time     = Time::execution(&App::beginFrame, this);
         auto const console_update_time  = Time::execution(&OutputConsole::update, console_);
-        auto const step_simulation_time = Time::execution(&App::stepSimulation, this, dt);
-        auto const render_settings_time = Time::execution(&Scene::renderSettings, scene_);
+        auto const render_settings_time = Time::execution(&App::renderSceneSettings, this);
         auto const render_stats_time    = Time::execution(&App::renderStats, this);
-        auto const render_time          = Time::execution(&Renderer::render, renderer_, window_.size(), *scene_, dt);
-        auto const console_render_time  = Time::execution(&OutputConsole::render, console_);
-        auto const finish_frame_time    = Time::execution(&Window::endFrame, window_);
+        auto const render_time          = Time::execution(
+            &Renderer::render,
+            renderer_,
+            window_.size(),
+            *simulation_,
+            dt);
+        auto const console_render_time = Time::execution(&OutputConsole::render, console_);
+        auto const finish_frame_time   = Time::execution(&Window::endFrame, window_);
 
         auto const end_time = Time::measure();
 
 
         spdlog::debug("Begin frame time: {}", begin_frame_time);
         spdlog::debug("Console update time: {}", console_update_time);
-        spdlog::debug("Step simulation time: {}", step_simulation_time);
         spdlog::debug("Render settings time: {}", render_settings_time);
         spdlog::debug("Render stats time: {}", render_stats_time);
         spdlog::debug("Render time: {}", render_time);
         spdlog::debug("Console render time: {}", console_render_time);
         spdlog::debug("Finish frame time: {}", finish_frame_time);
         spdlog::debug("Full loop timing: {}", Time::duration(start_time, end_time));
+
+        // A frame that overran keeps the next one, rather than the loop trying to make the
+        // time back by drawing two in a row.
+        next_frame += FRAME_PERIOD;
+
+        if (auto const now = std::chrono::steady_clock::now(); (next_frame < now)) {
+            next_frame = now;
+        }
+        else {
+            std::this_thread::sleep_until(next_frame);
+        }
     }
 }
 
-void App::stepSimulation(float dt)
+// The scene's own panels, drawn while the simulation is held. Everything they touch is the
+// thread's to read, so the borrow is the whole point rather than an implementation detail.
+void App::renderSceneSettings()
 {
-    simulationStepsTaken_ = 0;
-    simulationFellBehind_ = false;
-
-    if (simulationRate_.get() == 0) {
-        return;
-    }
-
-    float const step = 1.0F / static_cast<float>(simulationRate_.get());
-    physicsUpdateAccumulator_ += dt;
-
-    while ((physicsUpdateAccumulator_ >= step) && (simulationStepsTaken_ < simulationStepLimit_.get())) {
-        scene_->update(step);
-        physicsUpdateAccumulator_ -= step;
-        ++simulationStepsTaken_;
-    }
-
-    if (physicsUpdateAccumulator_ >= step) {
-        physicsUpdateAccumulator_ = std::fmod(physicsUpdateAccumulator_, step);
-        simulationFellBehind_     = true;
-    }
+    auto scene = simulation_->borrow();
+    scene->renderSettings();
 }
 
 void App::renderStats()
 {
-    if (!Settings::getInstance().peek<bool>("View", "Performance")->get()) {
+    if (!performanceVisible_.get()) {
         return;
     }
 
@@ -88,18 +105,7 @@ void App::renderStats()
 
     ImGui::SeparatorText("Simulation");
 
-    simulationRate_.render();
-    simulationStepLimit_.render();
-
-
-    if (simulationRate_.get() > 0) {
-        ImGui::Text("Step: %.3f ms", 1000.0F / static_cast<float>(simulationRate_.get()));
-        ImGui::Text("Steps: %zu / %zu", simulationStepsTaken_, simulationStepLimit_.get());
-
-        if (simulationFellBehind_) {
-            ImGui::TextColored(ImVec4{1.0F, 0.6F, 0.2F, 1.0F}, "Step limit reached, dropping time");
-        }
-    }
+    simulation_->renderSettings();
 
     ImGui::End();
 }

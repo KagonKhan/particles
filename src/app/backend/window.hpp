@@ -42,6 +42,9 @@ public:
 
     void beginFrame();
     void pollEvents() const noexcept { glfwPollEvents(); }
+
+    ///@brief Blocks until an event arrives. For the frames there is no reason to draw.
+    void waitEvents() const noexcept { glfwWaitEvents(); }
     void endFrame();
 
     [[nodiscard]] FramebufferSize size() const noexcept;

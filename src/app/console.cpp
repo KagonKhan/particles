@@ -26,8 +26,11 @@ constexpr float       ROW_SPACING   = {1.0F};
 } // namespace
 
 
+// Capacity and level are applied here rather than while drawing: the panel can be hidden for the
+// whole run, and an unapplied capacity leaves the history unbounded.
 void OutputConsole::update()
 {
+    applySettings();
     logBuffer_.drain(*sink_);
 }
 
@@ -39,9 +42,6 @@ void OutputConsole::render()
 
     if (ImGui::Begin("Console Log", panelVisible_.address())) {
         renderToolbar();
-
-        applySettings();
-
         renderMessages();
     }
 
@@ -160,7 +160,7 @@ float OutputConsole::syncRowOffsets(float width)
         || (dropped >= wrapped_.tops.size());
 
     if (stale) {
-        wrapped_.tops.assign(1, 0.0f);
+        wrapped_.tops.assign(1, 0.0F);
     }
     else {
         wrapped_.tops.erase(wrapped_.tops.begin(), wrapped_.tops.begin() + static_cast<std::ptrdiff_t>(dropped));

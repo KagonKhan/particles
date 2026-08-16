@@ -10,7 +10,8 @@
 namespace
 {
 
-constexpr float ITEM_WIDTH = 9.0F;
+// Widths in the menu are given in font sizes, so the bar keeps its proportions at any font scale.
+constexpr float ITEM_WIDTH_IN_FONT_SIZES = 9.0F;
 
 } // namespace
 
@@ -26,7 +27,7 @@ void Settings::render()
         }
 
         for (std::unique_ptr<KnobBase> const& knob : menu.knobs) {
-            ImGui::SetNextItemWidth(ImGui::GetFontSize() * ITEM_WIDTH);
+            ImGui::SetNextItemWidth(ImGui::GetFontSize() * ITEM_WIDTH_IN_FONT_SIZES);
             knob->render();
         }
 

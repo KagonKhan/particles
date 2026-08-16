@@ -13,7 +13,7 @@ namespace
 
 void glfwErrorCallback(int error, const char* description)
 {
-    spdlog::error("Glfw Error {}: {}\n", error, description);
+    spdlog::error("Glfw Error {}: {}", error, description);
 }
 
 } // namespace
@@ -56,12 +56,14 @@ WindowHandle Window::open(int width, int height, std::string const& title)
     // Which driver answered, said out loud. A software rasterizer is a working renderer and
     // announces itself no other way — it cost a day of benchmarking the wrong thing once.
     auto const* const renderer_name = reinterpret_cast<char const*>(glGetString(GL_RENDERER));
-    spdlog::info(
-        "GL renderer: {} | {}",
-        renderer_name,
-        reinterpret_cast<char const*>(glGetString(GL_VERSION)));
+    auto const* const version_name  = reinterpret_cast<char const*>(glGetString(GL_VERSION));
 
-    if (std::string_view {renderer_name}.contains("llvmpipe")) {
+    std::string_view const renderer {(renderer_name != nullptr)? renderer_name : "unknown"};
+    std::string_view const version {(version_name != nullptr)? version_name : "unknown"};
+
+    spdlog::info("GL renderer: {} | {}", renderer, version);
+
+    if (renderer.contains("llvmpipe")) {
         spdlog::warn("Rendering in software. Expect ~10x the CPU, on threads that compete with the simulation.");
     }
 

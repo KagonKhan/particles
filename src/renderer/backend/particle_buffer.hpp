@@ -27,8 +27,13 @@ public:
     ParticleBuffer(ParticleBuffer&&)                 = delete;
     ParticleBuffer& operator=(ParticleBuffer&&)      = delete;
 
-    // Advances to the next buffer in the ring, waits out the GPU if it is somehow still
-    // reading that one, and streams the positions in. Returns the particle count.
+    // Advances to the next buffer in the ring and waits out the GPU if it is somehow still
+    // reading that one. Separate from the upload because it is the one part of streaming a
+    // frame that can block on the GPU, and the pool it is about to copy from belongs to a
+    // thread that must not be made to wait on that.
+    void acquire();
+
+    // Streams the positions into the buffer `acquire` picked. Returns the particle count.
     GLuint upload(std::span<const ParticleVector> positions);
 
     // Marks the command stream past every draw that read this frame's buffer. Call once

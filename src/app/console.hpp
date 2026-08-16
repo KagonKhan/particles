@@ -43,8 +43,8 @@ private:
     // Row height calculations
     struct RowOffsets
     {
-        std::deque<float> tops {0.0f};
-        float width {0.0f};
+        std::deque<float> tops {0.0F};
+        float width {0.0F};
         int decoration {-1};
         std::uint64_t firstRow {0};
         std::uint64_t generation {0};

@@ -49,7 +49,7 @@ ParticleBuffer::~ParticleBuffer()
     glDeleteBuffers(BUFFER_COUNT, buffers_.data());
 }
 
-GLuint ParticleBuffer::upload(std::span<const ParticleVector> positions)
+void ParticleBuffer::acquire()
 {
     current_ = (current_ + 1) % BUFFER_COUNT;
 
@@ -64,7 +64,10 @@ GLuint ParticleBuffer::upload(std::span<const ParticleVector> positions)
         glDeleteSync(fences_[current_]);
         fences_[current_] = nullptr;
     }
+}
 
+GLuint ParticleBuffer::upload(std::span<const ParticleVector> positions)
+{
     std::memcpy(mapped_[current_], positions.data(), positions.size() * sizeof(ParticleVector));
     count_ = static_cast<GLuint>(positions.size());
 

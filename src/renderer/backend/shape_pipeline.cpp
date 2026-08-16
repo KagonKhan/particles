@@ -140,31 +140,31 @@ ShapePipeline::~ShapePipeline()
     glDeleteVertexArrays(1, &vao_);
 }
 
-void ShapePipeline::draw(std::span<SceneObject const* const> objects, RenderView const& view)
+void ShapePipeline::draw(std::span<SceneObject const> objects, RenderView const& view)
 {
     bodies_.clear();
 
-    for (SceneObject const* object : objects) {
-        if ((object == nullptr) || !object->visible) {
+    for (SceneObject const& object : objects) {
+        if (!object.visible) {
             continue;
         }
 
-        if (object->height <= 0.0F) {
+        if (object.height <= 0.0F) {
             continue; // no thickness, so the march has nothing to hit
         }
 
-        Drawing const drawing = std::visit([] (auto concrete) { return drawnAs(concrete); }, object->shape);
+        Drawing const drawing = std::visit([] (auto concrete) { return drawnAs(concrete); }, object.shape);
 
         for (Drawn const& drawn : drawing) {
-            glm::vec2 const centre = object->transform.position + drawn.offset;
+            glm::vec2 const centre = object.transform.position + drawn.offset;
 
             bodies_.push_back({
                 .placement = {centre.x, centre.y, drawn.footprint.x, drawn.footprint.y},
                 .params    = {
-                    drawn.dimensions.x, drawn.dimensions.y, object->height,
+                    drawn.dimensions.x, drawn.dimensions.y, object.height,
                     static_cast<float>(static_cast<std::uint8_t>(drawn.type))
                 },
-                .color = object->color,
+                .color = object.color,
             });
         }
     }

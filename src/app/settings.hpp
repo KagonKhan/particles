@@ -6,6 +6,7 @@
 #include "utils/knob.hpp"
 
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -35,7 +36,8 @@ public:
 
         for (Menu& candidate : menus_) {
             if (std::string_view {candidate.name} == menu) {
-                return candidate.knobs;
+                candidate.knobs.push_back(std::move(knob));
+                return out;
             }
         }
 

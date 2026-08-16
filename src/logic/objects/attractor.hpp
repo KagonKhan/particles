@@ -5,7 +5,9 @@
 #include "logic/particle_pool.hpp"
 #include "logic/scene_object.hpp"
 #include "utils/knob.hpp"
+#include "utils/math_utils.hpp"
 #include "utils/rng.hpp"
+
 #include <glm/common.hpp>
 #include <glm/ext/vector_float2.hpp>
 #include <glm/geometric.hpp>
@@ -14,7 +16,7 @@
 #include <imgui.h>
 
 #include <cmath>
-#include <numbers>
+#include <limits>
 #include <span>
 #include <vector>
 
@@ -22,20 +24,13 @@
 // outer fifth of the radius, since the loop compares squared distances and 0.8^2 = 0.64.
 constexpr float FADE_BEGINS = 0.64F;
 
-// Raising a float to a small integer power. std::pow takes its slow general path for a
-// float exponent, and this runs once per particle per frame — at a million particles that
-// difference is most of the frame budget.
-[[nodiscard]] constexpr float intPow(float base, int exponent) noexcept
-{
-    float     result    = 1.0F;
-    int const magnitude = exponent < 0? -exponent : exponent;
+// How far a single step may carry a particle towards the attractor, as a fraction of its
+// distance to the centre. At a strong power the force reaches 1e5 u/s^2 and beyond — growing
+// with distance one way, singular at the centre the other — and explicit Euler answers that
+// with one step long enough to leave the range for good. Half the distance is the most a step
+// can move a particle and still be describing the force it was sampled at.
+constexpr float MAX_STEP_FRACTION = 0.5F;
 
-    for (int i = 0; i < magnitude; ++i) {
-        result *= base;
-    }
-
-    return (exponent < 0)? 1.0F / result : result;
-}
 
 struct Advanced
 {
@@ -65,10 +60,16 @@ struct Simple
     Knob<float> range {"Range", 1.0F, 0.01F, 500.0F, "%.3f"};
     Knob<float> strength {"Strength", -5.0F, -100.0F, 100.0F, "%.3f"};
     Knob<float> inversePower {"Inverse Power", 1.0F, -5.0F, 5.0F, "%.3f"};
+    Knob<bool> stepClamp {
+        "Step Clamp", true,
+        "Caps the kick at what moves a particle half its distance to the centre in one step. "
+        "Off, a strong power throws it far enough that it never comes back — alive, but never "
+        "drawn again."
+    };
 
     std::vector<KnobBase*> knobs()
     {
-        return {&range, &strength, &inversePower};
+        return {&range, &strength, &inversePower, &stepClamp};
     }
 };
 
@@ -77,17 +78,18 @@ class Attractor
 public:
     void setPosition(glm::vec2 position) { object_.transform.position = position; }
 
-    // A chunk at a time, so the scene can put every object's kernel over one slice of the
-    // pool while it is in cache rather than sweeping the whole pool once per object.
     void simpleApply(ParticleChunk chunk, float dt) const
     {
-        // Read once for the chunk. Out of the loop these are constants the compiler can keep
-        // in registers; inside it, each is a load through `this` that it has to assume any
-        // write to a particle might have invalidated.
         glm::vec2 const centre   = object_.transform.position;
         float const     range_sq = settings_.range.get() * settings_.range.get();
         float const     scale    = settings_.strength.get();
         float const     power    = -settings_.inversePower.get();
+
+        // Off, the cap is infinite and the clamp below is a no-op — the toggle costs one
+        // branch per chunk rather than one per particle.
+        float const step_cap = settings_.stepClamp.get()
+                ? MAX_STEP_FRACTION / (dt * dt)
+                : std::numeric_limits<float>::infinity();
 
         for (std::size_t i {}; i < chunk.size(); ++i) {
             glm::vec2 const offset    = centre - chunk.positions[i];
@@ -101,46 +103,14 @@ public:
 
             if (distance > 0.0001F) {
                 glm::vec2 const direction = offset / distance;
-                float const     strength  = scale / std::powf(distance, power);
+                float const     unbounded = scale / std::powf(distance, power);
+                float const     cap       = step_cap * distance;
+                float const     strength  = glm::clamp(unbounded, -cap, cap);
 
                 chunk.velocities[i] += direction * strength * dt;
             }
         }
     }
-
-    // void advancedUpdate(std::span<ParticleVector> particles, std::span<ParticleVector> velocities, float dt)
-    // {
-    //     int const       power     = settings_.falloffPower.get();
-    //     float const     strength  = settings_.strength.get();
-    //     float const     range_sq  = settings_.range.get() * settings_.range.get();
-    //     float const     soften_sq = settings_.softening.get() * settings_.softening.get();
-    //     glm::vec2 const centre    = object_.transform.position;
-
-    //     float const swirl     = glm::radians(settings_.swirl.get());
-    //     float const swirl_cos = std::cos(swirl);
-    //     float const swirl_sin = std::sin(swirl);
-
-    //     float const drag_factor = std::exp(-settings_.damping.get() * dt);
-
-    //     for (std::size_t i {}; i < particles.size(); ++i) {
-    //         glm::vec2 const offset      = centre - particles[i];
-    //         float const     distance_sq = glm::dot(offset, offset);
-
-    //         // Squared on both sides, so deciding who is in range costs no square root.
-    //         if (distance_sq > range_sq) {
-    //             continue;
-    //         }
-
-    //         float const     window       = 1.0F - glm::smoothstep(FADE_BEGINS, 1.0F, distance_sq / range_sq);
-    //         float const     inv_distance = 1.0F / std::sqrt(distance_sq + soften_sq);
-    //         glm::vec2 const pull {
-    //             (offset.x * swirl_cos) - (offset.y * swirl_sin),
-    //             (offset.x * swirl_sin) + (offset.y * swirl_cos)};
-
-    //         velocities[i] += pull * (strength * intPow(inv_distance, power + 1) * window) * dt;
-    //         velocities[i] *= 1.0F + ((drag_factor - 1.0F) * window);
-    //     }
-    // }
 
     void apply(ParticleChunk chunk, float dt) const
     {
