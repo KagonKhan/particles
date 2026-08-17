@@ -1,6 +1,8 @@
 #ifndef YARR_UTILS_BENCH_HPP
 #define YARR_UTILS_BENCH_HPP
 
+#include "utils/logger.hpp"
+
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -41,7 +43,7 @@ struct RunResult
 // Nothing is written while a run is in progress: samples go to memory, and the file is
 // produced once the run ends. A run that wrote as it went would be measuring the filesystem
 // as much as the simulation.
-class Bench
+class Bench : private Logger<Bench>
 {
 public:
     void start(std::string label, RunConfig config);

@@ -4,6 +4,7 @@
 #include "app/backend/imgui_layer.hpp"
 #include "renderer/render_view.hpp"
 #include "utils/bases.hpp"
+#include "utils/logger.hpp"
 
 // Left to itself glfw3.h pulls in the system gl.h, which glew.h refuses to follow.
 #define GLFW_INCLUDE_NONE
@@ -28,7 +29,7 @@ struct GlfwLibrary : public Immovable<GlfwLibrary>
 };
 
 
-class Window : public Immovable<Window>
+class Window : public Immovable<Window>, private Logger<Window>
 {
 public:
     Window(int width, int height, std::string const& title);

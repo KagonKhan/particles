@@ -1,13 +1,13 @@
-#include "topology.hpp"
+#include "utils/topology.hpp"
 
-#include <spdlog/spdlog.h>
+#include "utils/logger.hpp"
 
-#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <string_view>
 
 #ifdef __linux__
     #include <sched.h>
@@ -218,7 +218,7 @@ bool pinToLargestCache()
 
     bool const applied = applyToEveryThread(mask);
 
-    spdlog::info(
+    Logger<Topology>::info(
         "Affinity: {} to {} of {} CPUs sharing {} MiB",
         applied? "pinned" : "failed to pin",
         machine.largestCacheCpus.size(),

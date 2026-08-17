@@ -2,9 +2,8 @@
 
 #include "exceptions.hpp"
 #include "renderer/render_view.hpp"
+#include "utils/logger.hpp"
 #include "utils/opengl.hpp"
-
-#include <spdlog/spdlog.h>
 
 #include <string_view>
 
@@ -13,7 +12,7 @@ namespace
 
 void glfwErrorCallback(int error, const char* description)
 {
-    spdlog::error("Glfw Error {}: {}", error, description);
+    Logger<Window>::error("Glfw Error {}: {}", error, description);
 }
 
 } // namespace
@@ -61,10 +60,10 @@ WindowHandle Window::open(int width, int height, std::string const& title)
     std::string_view const renderer {(renderer_name != nullptr)? renderer_name : "unknown"};
     std::string_view const version {(version_name != nullptr)? version_name : "unknown"};
 
-    spdlog::info("GL renderer: {} | {}", renderer, version);
+    info("GL renderer: {} | {}", renderer, version);
 
     if (renderer.contains("llvmpipe")) {
-        spdlog::warn("Rendering in software. Expect ~10x the CPU, on threads that compete with the simulation.");
+        warning("Rendering in software. Expect ~10x the CPU, on threads that compete with the simulation.");
     }
 
     glfwSwapInterval(0);

@@ -1,8 +1,8 @@
-#ifndef YARR_SHADERS_HPP
-#define YARR_SHADERS_HPP
+#ifndef YARR_UTILS_SHADER_CACHE_HPP
+#define YARR_UTILS_SHADER_CACHE_HPP
 
-#include "bases.hpp"
-#include "opengl.hpp"
+#include "utils/bases.hpp"
+#include "utils/opengl.hpp"
 
 #include <filesystem>
 #include <initializer_list>
@@ -50,4 +50,4 @@ struct DefaultShaders : public Immovable<DefaultShaders>
 };
 
 
-#endif // YARR_SHADERS_HPP
+#endif // YARR_UTILS_SHADER_CACHE_HPP

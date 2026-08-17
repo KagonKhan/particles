@@ -3,8 +3,6 @@
 #include "app/console.hpp"
 #include "utils/utils.hpp"
 
-#include <spdlog/fmt/chrono.h>
-#include <spdlog/spdlog.h>
 
 #include <chrono>
 #include <thread>
@@ -62,14 +60,14 @@ void App::run()
         auto const end_time = Time::measure();
 
 
-        spdlog::debug("Begin frame time: {}", begin_frame_time);
-        spdlog::debug("Console update time: {}", console_update_time);
-        spdlog::debug("Render settings time: {}", render_settings_time);
-        spdlog::debug("Render stats time: {}", render_stats_time);
-        spdlog::debug("Render time: {}", render_time);
-        spdlog::debug("Console render time: {}", console_render_time);
-        spdlog::debug("Finish frame time: {}", finish_frame_time);
-        spdlog::debug("Full loop timing: {}", Time::duration(start_time, end_time));
+        debug("Begin frame time: {}", begin_frame_time);
+        debug("Console update time: {}", console_update_time);
+        debug("Render settings time: {}", render_settings_time);
+        debug("Render stats time: {}", render_stats_time);
+        debug("Render time: {}", render_time);
+        debug("Console render time: {}", console_render_time);
+        debug("Finish frame time: {}", finish_frame_time);
+        debug("Full loop timing: {}", Time::duration(start_time, end_time));
 
         // A frame that overran keeps the next one, rather than the loop trying to make the
         // time back by drawing two in a row.

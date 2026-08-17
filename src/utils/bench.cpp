@@ -1,6 +1,5 @@
-#include "bench.hpp"
+#include "utils/bench.hpp"
 
-#include <spdlog/spdlog.h>
 #include <imgui.h>
 
 #include <algorithm>
@@ -185,7 +184,7 @@ void Bench::finish()
 
     result.path = std::filesystem::absolute(samples_path, error).string();
 
-    spdlog::info(
+    info(
         "Bench '{}': {:.1f} us mean over {} steps -> {}",
         result.label,
         result.meanMicros,

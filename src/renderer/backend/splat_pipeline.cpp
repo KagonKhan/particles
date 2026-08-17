@@ -4,7 +4,6 @@
 
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
-#include <spdlog/spdlog.h>
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -51,7 +50,7 @@ SplatPipeline::SplatPipeline()
     }
 
     maxWorkGroups_ = static_cast<GLuint>(max_groups[0]);
-    spdlog::info(
+    info(
         "max compute work groups: {} x {} x {} ({} particles per dispatch axis)",
         max_groups[0],
         max_groups[1],

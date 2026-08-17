@@ -3,6 +3,7 @@
 
 #include "renderer/backend/particle_buffer.hpp"
 #include "renderer/render_view.hpp"
+#include "utils/logger.hpp"
 
 #include <GL/glew.h>
 
@@ -15,7 +16,7 @@
 //
 // The heavy path: it survives counts that make the point rasterizer give up, and it can
 // express density that overlapping sprites cannot. Reach for PointPipeline first.
-class SplatPipeline
+class SplatPipeline : private Logger<SplatPipeline>
 {
 public:
     SplatPipeline();

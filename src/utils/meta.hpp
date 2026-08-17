@@ -1,10 +1,10 @@
-#ifndef PROJECT_UTILS_META_HPP
-#define PROJECT_UTILS_META_HPP
+#ifndef YARR_UTILS_META_HPP
+#define YARR_UTILS_META_HPP
 
-#include <array>   // std::array
-#include <string>
+#include <array>
+#include <cstddef>
 #include <string_view>
-#include <utility> // std::index_sequence
+#include <utility>
 
 template <std::size_t... Idxs>
 constexpr auto substringAsArray(std::string_view str, std::index_sequence<Idxs...>)
@@ -53,4 +53,4 @@ constexpr auto typeName() -> std::string_view
     return std::string_view {VALUE.data(), VALUE.size()};
 }
 
-#endif // PROJECT_UTILS_META_HPP
+#endif // YARR_UTILS_META_HPP

@@ -19,7 +19,7 @@ FlowLayout::FlowLayout(float item_width) noexcept
 
 bool FlowLayout::button(char const* label)
 {
-    sameLineIfFits(ImGui::CalcTextSize(label, nullptr, true).x + (ImGui::GetStyle().FramePadding.x * 2.0f));
+    sameLineIfFits(ImGui::CalcTextSize(label, nullptr, true).x + (ImGui::GetStyle().FramePadding.x * 2.0F));
     return ImGui::Button(label);
 }
 

@@ -2,6 +2,7 @@
 #define YARR_PARTICLE_BUFFER_HPP
 
 #include "logic/particle_pool.hpp"
+#include "utils/logger.hpp"
 
 #include <GL/glew.h>
 
@@ -15,7 +16,7 @@
 //
 // Persistently mapped and triple buffered: the CPU writes buffer N while the GPU is
 // still reading N-1, and a fence per buffer keeps the two from meeting.
-class ParticleBuffer
+class ParticleBuffer : private Logger<ParticleBuffer>
 {
 public:
     ParticleBuffer();

@@ -1,8 +1,10 @@
-#ifndef YARR_RNG_HPP
-#define YARR_RNG_HPP
+#ifndef YARR_UTILS_RNG_HPP
+#define YARR_UTILS_RNG_HPP
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <numbers>
 #include <random>
 
 class Rng
@@ -14,23 +16,23 @@ public:
         : engine_(seed) {}
 
     // Uniform float in [min, max)
-    float range(float min, float max)
+    [[nodiscard]] float range(float min, float max)
     {
         std::uniform_real_distribution<float> dist(min, max);
         return dist(engine_);
     }
 
     // Uniform int in [min, max] (inclusive)
-    int range(int min, int max)
+    [[nodiscard]] int range(int min, int max)
     {
         std::uniform_int_distribution<int> dist(min, max);
         return dist(engine_);
     }
 
     // Uniform angle in radians [0, 2*pi)
-    float angle()
+    [[nodiscard]] float angle()
     {
-        return range(0.0f, 6.28318530718f);
+        return range(0.0F, 2.0F * std::numbers::pi_v<float>);
     }
 
     // Uniform point on the unit circle, useful for random directions
@@ -46,23 +48,23 @@ public:
     // bunch the directions up around the poles.
     void unitVector(float& x, float& y, float& z)
     {
-        z = range(-1.0f, 1.0f);
+        z = range(-1.0F, 1.0F);
 
         float yaw    = angle();
-        float radius = std::sqrt(std::max(0.0f, 1.0f - (z * z)));
+        float radius = std::sqrt(std::max(0.0F, 1.0F - (z * z)));
 
         x = radius * std::cos(yaw);
         y = radius * std::sin(yaw);
     }
 
     // 0.0 to 1.0
-    float normalized()
+    [[nodiscard]] float normalized()
     {
-        return range(0.0f, 1.0f);
+        return range(0.0F, 1.0F);
     }
 
     // Coin flip
-    bool chance(float probability = 0.5f)
+    [[nodiscard]] bool chance(float probability = 0.5F)
     {
         return normalized() < probability;
     }
@@ -71,4 +73,4 @@ private:
     std::mt19937 engine_;
 };
 
-#endif // YARR_RNG_HPP
+#endif // YARR_UTILS_RNG_HPP

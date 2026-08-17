@@ -1,7 +1,7 @@
-#ifndef PROJECT_UTILS_LOGGER_HPP
-#define PROJECT_UTILS_LOGGER_HPP
+#ifndef YARR_UTILS_LOGGER_HPP
+#define YARR_UTILS_LOGGER_HPP
 
-#include "meta.hpp"
+#include "utils/meta.hpp"
 
 // Teaches the formatter about std::chrono::duration and system_clock time points, so a
 // duration logs as "12ms" instead of needing .count() and a hand-written unit at every
@@ -10,70 +10,78 @@
 #include <spdlog/logger.h>
 #include <spdlog/spdlog.h>
 
+#include <atomic>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
 
+
+// Names a logger after Class, so every record carries the type that emitted it and the console
+// can show it. Usable two ways, because not everything that logs has an instance to hand:
+// inherit it privately and call `info(...)`, or qualify it as `Logger<Class>::info(...)` from a
+// static member or a free function that belongs to Class in all but language.
 template <typename Class>
 class Logger
 {
 public:
     template <typename ... Args>
-    void trace(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    static void trace(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_->trace(fmt, std::forward<Args>(args)...);
+        logger().trace(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    void debug(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    static void debug(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_->debug(fmt, std::forward<Args>(args)...);
+        logger().debug(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    void info(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    static void info(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_->info(fmt, std::forward<Args>(args)...);
+        logger().info(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    void warning(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    static void warning(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_->warn(fmt, std::forward<Args>(args)...);
+        logger().warn(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    void error(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    static void error(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_->error(fmt, std::forward<Args>(args)...);
+        logger().error(fmt, std::forward<Args>(args)...);
     }
 
     template <typename ... Args>
-    void critical(spdlog::format_string_t<Args...> fmt, Args&&... args) const
+    static void critical(spdlog::format_string_t<Args...> fmt, Args&&... args)
     {
-        logger_->critical(fmt, std::forward<Args>(args)...);
-    }
-
-    Logger()
-    {
-        std::call_once(
-            initFlag_,
-            [] {
-                auto name = std::string(typeName<Class>());
-                logger_   = spdlog::get(name);
-
-                if (!logger_) {
-                    logger_ = defaultLogger().clone(name);
-                    spdlog::register_logger(logger_);
-                }
-            });
+        logger().critical(fmt, std::forward<Args>(args)...);
     }
 
 private:
-    inline static std::shared_ptr<spdlog::logger> logger_;
-    inline static std::once_flag                  initFlag_;
-
-    static spdlog::logger& defaultLogger()
+    // Resolved on first log rather than on construction. The console sink is attached to the
+    // default logger inside main(), and a clone taken before that — by a static member, or by
+    // anything constructed during static initialization — would never reach the panel.
+    static spdlog::logger& logger()
     {
-        static std::shared_ptr<spdlog::logger> instance = spdlog::default_logger();
-        return *instance.get();
+        static std::shared_ptr<spdlog::logger> const instance = [] {
+                auto name = std::string {typeName<Class>()};
+
+                if (std::shared_ptr<spdlog::logger> existing = spdlog::get(name)) {
+                    return existing;
+                }
+
+                std::shared_ptr<spdlog::logger> created = spdlog::default_logger()->clone(name);
+                spdlog::register_logger(created);
+
+                return created;
+            } ();
+
+        return *instance;
     }
 };
 
@@ -181,7 +189,7 @@ protected:
     }
 
 private:
-    inline static std::atomic<int64_t> instances_ {0};
+    inline static std::atomic<std::int64_t> instances_ {0};
 };
 
-#endif // PROJECT_UTILS_LOGGER_HPP
+#endif // YARR_UTILS_LOGGER_HPP

@@ -1,9 +1,8 @@
-#include "shader_cache.hpp"
+#include "utils/shader_cache.hpp"
 
 #include "exceptions.hpp"
+#include "utils/logger.hpp"
 #include "utils/utils.hpp"
-
-#include <spdlog/common.h>
 
 #include <filesystem>
 #include <format>
@@ -95,7 +94,7 @@ void printShaderLog(GLuint shader)
     std::vector<char> log(log_length > 0? log_length : 1);
     glGetShaderInfoLog(shader, log_length, nullptr, log.data());
 
-    spdlog::error("Shader compilation failed:\n\t{}", log.data());
+    Logger<ShaderCache>::error("Shader compilation failed:\n\t{}", log.data());
 }
 
 void printProgramLog(GLuint program)
@@ -106,7 +105,7 @@ void printProgramLog(GLuint program)
     std::vector<char> log(log_length > 0? log_length : 1);
     glGetProgramInfoLog(program, log_length, nullptr, log.data());
 
-    spdlog::error("Program compilation failed:\n\t{}", log.data());
+    Logger<ShaderCache>::error("Program compilation failed:\n\t{}", log.data());
 }
 
 GLuint compileShader(Shader const& shader)
@@ -119,12 +118,12 @@ GLuint compileShader(Shader const& shader)
     glShaderSource(gl_shader, 1, &source_c, nullptr);
     glCompileShader(gl_shader);
 
-    checkOpenGLError();
+    bool const gl_error = checkOpenGLError();
 
     GLint success = GL_FALSE;
     glGetShaderiv(gl_shader, GL_COMPILE_STATUS, &success);
 
-    if (success != GL_TRUE) {
+    if (gl_error || (success != GL_TRUE)) {
         printShaderLog(gl_shader);
         glDeleteShader(gl_shader);
         throw ShaderError("Shader {} compilation failed", shader.source.string());
@@ -142,10 +141,13 @@ GLuint createProgram(std::initializer_list<GLuint> shaders)
     }
 
     glLinkProgram(program);
-    checkOpenGLError();
+
+    bool const gl_error = checkOpenGLError();
+
     GLint success = GL_FALSE;
     glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (success != GL_TRUE) {
+
+    if (gl_error || (success != GL_TRUE)) {
         printProgramLog(program);
         glDeleteProgram(program);
         throw ShaderError("Program linking failed");
@@ -205,7 +207,7 @@ GLuint ShaderCache::getProgram(std::string const& name)
 GLuint ShaderCache::compileProgram(std::string const& name, std::initializer_list<GLuint> shaders)
 {
     if (shaders.size() == 0) {
-        throw ShaderError("{} program compilation requries at least one shader!");
+        throw ShaderError("{} program compilation requires at least one shader", name);
     }
 
     GLuint program = createProgram(shaders);
@@ -214,7 +216,7 @@ GLuint ShaderCache::compileProgram(std::string const& name, std::initializer_lis
     }
 
     programCache_[name] = program;
-    spdlog::info("Compiled shader program: {}", name);
+    Logger<ShaderCache>::info("Compiled shader program: {}", name);
     return program;
 }
 

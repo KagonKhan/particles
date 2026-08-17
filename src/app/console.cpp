@@ -208,12 +208,10 @@ void OutputConsole::drawRow(std::size_t row)
     ImGui::PopStyleColor();
 }
 
+// The source is always present: a line that does not say which type emitted it is the one thing
+// no amount of reading the message recovers.
 std::string_view OutputConsole::formatMessage(ConsoleMessage const& message)
 {
-    if (!showTimestamps_.get() && !showLevels_.get()) {
-        return message.text;
-    }
-
     scratchPad_.clear();
 
     if (showTimestamps_.get()) {
@@ -224,6 +222,8 @@ std::string_view OutputConsole::formatMessage(ConsoleMessage const& message)
     if (showLevels_.get()) {
         fmt::format_to(std::back_inserter(scratchPad_), "[{}] ", spdlog::level::to_string_view(message.level));
     }
+
+    fmt::format_to(std::back_inserter(scratchPad_), "[{}] ", message.source);
 
     scratchPad_.append(message.text);
     return scratchPad_;

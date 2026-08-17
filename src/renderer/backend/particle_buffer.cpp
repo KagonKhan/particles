@@ -1,6 +1,5 @@
 #include "particle_buffer.hpp"
 
-#include <spdlog/spdlog.h>
 #include <cstring>
 #include <stdexcept>
 
@@ -58,7 +57,7 @@ void ParticleBuffer::acquire()
         if ((result == GL_TIMEOUT_EXPIRED) || (result == GL_WAIT_FAILED)) {
             // Falling through overwrites storage the GPU may still be reading, which
             // tears the cloud for a frame. Better than deadlocking on a lost context.
-            spdlog::warn("particle buffer fence wait failed/timed out");
+            warning("particle buffer fence wait failed/timed out");
         }
 
         glDeleteSync(fences_[current_]);

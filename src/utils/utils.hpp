@@ -1,5 +1,5 @@
-#ifndef PROJECT_UTILS_UTIL_HPP
-#define PROJECT_UTILS_UTIL_HPP
+#ifndef YARR_UTILS_UTILS_HPP
+#define YARR_UTILS_UTILS_HPP
 
 #include "exceptions.hpp"
 
@@ -8,12 +8,15 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <string>
 #include <type_traits>
 #include <utility>
 
 struct Time
 {
-    [[nodiscard]] static auto measure() noexcept { return std::chrono::high_resolution_clock::now(); }
+    // Steady, not high_resolution_clock: libstdc++ makes the latter an alias for system_clock, so a
+    // clock adjustment or a resume would land straight in a frame time.
+    [[nodiscard]] static auto measure() noexcept { return std::chrono::steady_clock::now(); }
     template <typename Duration = std::chrono::milliseconds>
     [[nodiscard]] static auto duration(auto const& t1, auto const& t2) noexcept
     {
@@ -62,7 +65,7 @@ struct DeltaTimeClock
 private:
     static constexpr float FRAME_TIME_SMOOTHING = 0.05F;
 
-    std::chrono::high_resolution_clock::time_point previousFrame_ = Time::measure();
+    std::chrono::steady_clock::time_point previousFrame_ = Time::measure();
 
     float smoothedFrameTime_ = 1.0F / 60.0F;
 };
@@ -74,13 +77,21 @@ inline std::string fileToString(std::filesystem::path const& path)
         throw FileError("{} file does not exist", path.string());
     }
 
-    try {
-        std::ifstream file(path, std::ios::binary);
-        return {std::istreambuf_iterator<char>(file), {}};
+    std::ifstream file(path, std::ios::binary);
+
+    // Checked, because a stream that failed to open reads as empty rather than throwing, and an
+    // empty shader source reaches the driver as a compile error naming nothing.
+    if (!file) {
+        throw FileError("{} file could not be opened", path.string());
     }
-    catch (std::exception const& e) {
-        throw FileError("{} file could not be parsed: {}", path.string(), e.what());
+
+    std::string contents {std::istreambuf_iterator<char>(file), {}};
+
+    if (file.bad()) {
+        throw FileError("{} file could not be read", path.string());
     }
+
+    return contents;
 }
 
-#endif // PROJECT_UTILS_UTIL_HPP
+#endif // YARR_UTILS_UTILS_HPP

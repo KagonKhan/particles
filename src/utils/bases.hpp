@@ -1,5 +1,5 @@
-#ifndef YARR_BASES_HPP
-#define YARR_BASES_HPP
+#ifndef YARR_UTILS_BASES_HPP
+#define YARR_UTILS_BASES_HPP
 
 ///@brief disables all special members
 template <typename Derived>
@@ -50,4 +50,4 @@ protected:
     Singleton &operator =(Singleton&&)      = delete;
 };
 
-#endif // YARR_BASES_HPP
+#endif // YARR_UTILS_BASES_HPP

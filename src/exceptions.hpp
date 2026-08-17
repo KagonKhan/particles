@@ -5,12 +5,8 @@
 
 #include <stdexcept>
 
-#include <format>
-
 struct InitializationError : std::runtime_error
 {
-    using std::runtime_error::runtime_error;
-
     template <typename ... Args>
     InitializationError(fmt::format_string<Args...> fmt, Args&&... args)
         : std::runtime_error(fmt::format(fmt, std::forward<Args>(args)...))
@@ -19,8 +15,6 @@ struct InitializationError : std::runtime_error
 
 struct FileError : std::runtime_error
 {
-    using std::runtime_error::runtime_error;
-
     template <typename ... Args>
     FileError(fmt::format_string<Args...> fmt, Args&&... args)
         : std::runtime_error(fmt::format(fmt, std::forward<Args>(args)...))
@@ -30,8 +24,6 @@ struct FileError : std::runtime_error
 
 struct ShaderError : std::runtime_error
 {
-    using std::runtime_error::runtime_error;
-
     template <typename ... Args>
     ShaderError(fmt::format_string<Args...> fmt, Args&&... args)
         : std::runtime_error(fmt::format(fmt, std::forward<Args>(args)...))

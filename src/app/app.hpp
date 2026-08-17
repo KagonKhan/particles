@@ -8,13 +8,14 @@
 #include "renderer/renderer.hpp"
 #include "utils/bases.hpp"
 #include "utils/knob.hpp"
+#include "utils/logger.hpp"
 #include "utils/utils.hpp"
 
 #include <memory>
 #include <string>
 
 
-class App : public Immovable<App>
+class App : public Immovable<App>, private Logger<App>
 {
 public:
     App(std::string const& title, std::shared_ptr<ImGuiConsoleSink> log_sink);
