@@ -27,24 +27,31 @@ public:
     class Access
     {
     public:
+        ~Access();
+
+        // Never moved or copied: `borrow`'s prvalue is constructed in place, and a moved-from
+        // guard would have to decide which of the two ends the borrow.
+        Access(Access const&)             = delete;
+        Access(Access&&)                  = delete;
+        Access& operator =(Access const&) = delete;
+        Access& operator =(Access&&)      = delete;
+
         Scene* operator ->() const noexcept { return scene_; }
         Scene& operator *() const noexcept  { return *scene_; }
 
     private:
         friend class Simulation;
 
-        Access(std::mutex& mutex, Scene& scene)
-            : lock_{mutex},
-              scene_{&scene}
-        {}
+        explicit Access(Simulation& owner);
 
+        Simulation*                  owner_;
         std::unique_lock<std::mutex> lock_;
         Scene*                       scene_;
     };
 
     Simulation();
 
-    [[nodiscard]] Access borrow() { return Access {sceneMutex_, *scene_}; }
+    [[nodiscard]] Access borrow() { return Access {*this}; }
 
     ///@brief The rate and pause knobs, and what the thread actually managed. Main thread.
     void renderSettings();
@@ -61,17 +68,33 @@ private:
     };
     Knob<int> rate_ {
         "Simulation Rate", 120, 1, 480, "%d Hz",
-        "Step size and step frequency both: one step per 1 / rate of wall time, each worth\n1 / rate of simulated time. Independent of the frame rate."
+        "How often a step happens: one per 1 / rate of wall time. Independent of the frame rate."
+    };
+    Knob<float> timeScale_ {
+        "Time Scale", 1.0F, 0.01F, 4.0F, "%.2fx",
+        "Simulated time per step, as a multiple of the rate's. Slow motion costs nothing —\nthe same steps happen just as often, each covering less time, so the motion stays\nsmooth and the integration gets finer rather than coarser.",
+        ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic
     };
 
     // What the thread reads. The knobs themselves belong to the frame loop that draws them,
     // so their values are pushed across here rather than read from another thread.
     std::atomic<int>   tickRate_ {120};
+    std::atomic<float> tickScale_ {1.0F};
     std::atomic<bool>  ticking_ {true};
     std::atomic<float> achievedRate_ {0.0F};
+    std::atomic<float> stepCostMicros_ {0.0F};
 
     std::mutex                  tickMutex_;
     std::condition_variable_any tickWake_;
+
+    // Borrows outstanding, and the thread's promise not to start another step while any of
+    // them are waiting. A saturated thread holds the scene mutex for the whole of every step
+    // and frees it for the hundred nanoseconds between two, and glibc's mutex is not fair —
+    // a waiter that has to be scheduled first loses that race essentially every time. The
+    // handoff replaces the race with a rule.
+    std::atomic<int>        waiters_ {0};
+    std::mutex              handoffMutex_;
+    std::condition_variable handoff_;
 
     // Last, so it starts once everything it touches exists and is joined before any of it
     // goes away.
