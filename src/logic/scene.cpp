@@ -76,9 +76,6 @@ void Scene::update(float dt)
 
 void Scene::renderSettings()
 {
-    emitter_->renderSettings(*pool_);
-    attractor_->renderSettings();
-
     renderTuning();
 }
 

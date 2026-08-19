@@ -31,6 +31,22 @@ struct SceneObject
 
     glm::vec4 color {0.35F, 0.45F, 0.75F, 1.0F};
     bool visible {true};
+
+    std::string name = "TODO: OBJECT NAME";
+
+    void* attached = nullptr;
+    enum class AttachedType
+    {
+        NONE,
+        EMITTER,
+        ATTRACTOR,
+    } attachedType = AttachedType::NONE;
+
+    template <typename T>
+    T* getAttachment()
+    {
+        return static_cast<T*>(attached);
+    }
 };
 
 
@@ -267,5 +283,47 @@ inline void deserialize(SceneObject& object, nlohmann::json const& in)
         deserialize(object.shape, *entry);
     }
 }
+
+struct SceneObjectView
+{
+    bool operator ()(SceneObject& object)
+    {
+        // Two objects can end up in one window sharing every label below.
+        ImGui::PushID(&object);
+
+        bool changed = ImGui::Checkbox("Visible", &object.visible);
+
+        changed = ImGui::SliderFloat2(
+            "Position",
+            glm::value_ptr(object.transform.position),
+            -10.0F,
+            10.0F,
+            "%.3f u") || changed;
+
+        changed = renderShapeSettings(object.shape) || changed;
+
+        changed = ImGui::SliderFloat("Height", &object.height, 0.01F, 5.0F, "%.3f u") || changed;
+        ImGui::SetItemTooltip("How far the body reaches out of its own plane. Match a circle's radius for a sphere.");
+
+        changed = ImGui::ColorEdit3("Color", glm::value_ptr(object.color)) || changed;
+
+        ImGui::PopID();
+
+        return changed;
+    }
+
+private:
+    bool renderShapeSettings(Shape& shape)
+    {
+        int  type    = static_cast<int>(shape.index());
+        bool changed = ImGui::Combo("Type", &type, SHAPE_NAMES.data(), static_cast<int>(SHAPE_NAMES.size()));
+
+        if (changed) {
+            shape = defaultShape(static_cast<std::size_t>(type));
+        }
+
+        return std::visit([] (auto& concrete) { return renderShapeFields(concrete); }, shape) || changed;
+    }
+};
 
 #endif // YARR_LOGIC_SCENE_OBJECT_HPP

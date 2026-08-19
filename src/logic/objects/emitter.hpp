@@ -13,6 +13,11 @@
 class Emitter
 {
 public:
+    Emitter()
+    {
+        object_.attached = this;
+    }
+
     void spawn(ParticlePool& pool, float dt);
     void reap(ParticlePool& pool, float dt);
 
@@ -22,6 +27,7 @@ public:
     [[nodiscard]] bool               isEnabled() const noexcept               { return emittingSettings_.enabled; }
     [[nodiscard]] bool               isVisible() const noexcept               { return object_.visible; }
     [[nodiscard]] SceneObject const& object() const noexcept                  { return object_; }
+    [[nodiscard]] SceneObject&       object() noexcept                        { return object_; }
 
 
 private:
@@ -34,11 +40,13 @@ private:
     } emittingSettings_;
 
     SceneObject object_ {
-        . transform = {},
-        .shape      = Circle {},
-        .height     = 0.25F,
-        .color      = {0.30F, 0.70F, 0.45F, 1.0F},
-        .visible    = true,
+        . transform   = {},
+        .shape        = Circle {},
+        .height       = 0.25F,
+        .color        = {0.30F, 0.70F, 0.45F, 1.0F},
+        .visible      = true,
+        .name         = "Emitter",
+        .attachedType = SceneObject::AttachedType::EMITTER,
     };
 
     double spawnAccumulator_ {};

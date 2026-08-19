@@ -65,8 +65,6 @@ void PointPipeline::draw(ParticleBuffer const& particles, RenderView const& view
 
 void PointPipeline::renderSettings()
 {
-    ImGui::Begin("Points");
-
     ImGui::ColorEdit4("Color", glm::value_ptr(particleColor_), ImGuiColorEditFlags_AlphaBar);
     ImGui::SetItemTooltip("Alpha is per-particle weight — low values let density build up gradually");
 
@@ -84,6 +82,4 @@ void PointPipeline::renderSettings()
     ImGui::SetItemTooltip(
         "Additive needs no depth sorting, so overlapping particles are order independent.\n"
         "Alpha blending does need it, and nothing here sorts — expect popping.");
-
-    ImGui::End();
 }

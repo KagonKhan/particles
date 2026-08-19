@@ -1,9 +1,11 @@
 #include "app.hpp"
 
 #include "app/console.hpp"
+#include "scene_layout.hpp"
 #include "utils/utils.hpp"
 
 
+#include <imgui.h>
 #include <chrono>
 #include <thread>
 #include <utility>
@@ -96,13 +98,14 @@ void App::renderStats()
         return;
     }
 
-    ImGui::Begin("Performance");
+    ImGui::Begin("Simulation");
 
+    ImGui::SeparatorText("Rendering");
     ImGui::Text("FPS: %.1f", 1.0F / clock_.get());
+    ImGui::SameLine();
     ImGui::Text("Frame: %.3f ms", clock_.get() * 1000.0F);
 
     ImGui::SeparatorText("Simulation");
-
     simulation_->renderSettings();
 
     ImGui::End();

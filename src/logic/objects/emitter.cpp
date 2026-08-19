@@ -54,8 +54,6 @@ void Emitter::reap(ParticlePool& pool, float dt)
 
 void Emitter::renderSettings(ParticlePool& pool)
 {
-    ImGui::Begin("Emitter Settings");
-
     ImGui::Text("Active particles: %zu", pool.aliveCount);
     ImGui::Checkbox("Update", &emittingSettings_.enabled);
     ImGui::SliderFloat("Spawn rate", &emittingSettings_.spawnRate, 0.0F, 100'000, "%.0f /sec");
@@ -73,10 +71,4 @@ void Emitter::renderSettings(ParticlePool& pool)
     if (ImGui::Button("Kill")) {
         pool.aliveCount = 0;
     }
-
-    ImGui::SeparatorText("Body");
-
-    renderSceneObjectSettings(object_);
-
-    ImGui::End();
 }

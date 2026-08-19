@@ -38,7 +38,7 @@ private:
 
     Knob<bool>& performanceVisible_ {Settings::getInstance().option<bool>(
                                          "View",
-                                         "Performance",
+                                         "Simulation",
                                          true,
                                          "The frame and simulation timings panel")
     };

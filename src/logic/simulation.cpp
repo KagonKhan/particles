@@ -1,5 +1,7 @@
 #include "simulation.hpp"
 
+#include "app/scene_layout.hpp"
+
 #include <imgui.h>
 
 #include <array>
@@ -132,6 +134,15 @@ void Simulation::run(std::stop_token stop)
 
 void Simulation::renderSettings()
 {
+    {
+        // The view edits the bodies the stepping thread reads, so it is drawn under a borrow
+        // like the scene's other panels rather than beside them.
+        auto      scene = borrow();
+        SceneView view;
+        view.render(*scene);
+    }
+
+
     std::array<KnobBase*, 3> const knobs {&running_, &rate_, &timeScale_};
 
     if (renderKnobs(knobs)) {

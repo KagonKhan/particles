@@ -25,11 +25,7 @@ constexpr float TWO_PI           = 2.0F * std::numbers::pi_v<float>;
 
 void Renderer::renderCameraPanel()
 {
-    if (!showCamera_.get()) {
-        return;
-    }
-
-    ImGui::Begin("Camera");
+    ImGui::SeparatorText("Camera");
 
     int  projection = static_cast<int>(camera_.projection);
     bool switched   = ImGui::RadioButton("3D", &projection, static_cast<int>(Projection::PERSPECTIVE));
@@ -90,28 +86,20 @@ void Renderer::renderCameraPanel()
     ImGui::SetItemTooltip("Sweeps the view around where the camera stands");
     ImGui::TextDisabled("WASD flies, right-drag or Q/E looks, Shift for speed");
     ImGui::TextDisabled("Left-drag moves the emitter across the plane");
-    ImGui::End();
 }
 
 void Renderer::renderSettings(float dt)
 {
-    if (showRenderer_.get()) {
-        ImGui::Begin("Renderer");
+    ImGui::SeparatorText("Mode");
 
-        ImGui::SeparatorText("Mode");
+    int mode = static_cast<int>(mode_);
+    ImGui::RadioButton("Points", &mode, static_cast<int>(RenderMode::POINTS));
+    ImGui::SetItemTooltip("One GL_POINTS draw. Simple, and what to use while working on the simulation.");
+    ImGui::SameLine();
+    ImGui::RadioButton("Splat", &mode, static_cast<int>(RenderMode::SPLAT));
+    ImGui::SetItemTooltip("Compute-accumulated density. Survives counts the point rasterizer will not.");
+    mode_ = static_cast<RenderMode>(mode);
 
-        int mode = static_cast<int>(mode_);
-        ImGui::RadioButton("Points", &mode, static_cast<int>(RenderMode::POINTS));
-        ImGui::SetItemTooltip("One GL_POINTS draw. Simple, and what to use while working on the simulation.");
-        ImGui::SameLine();
-        ImGui::RadioButton("Splat", &mode, static_cast<int>(RenderMode::SPLAT));
-        ImGui::SetItemTooltip("Compute-accumulated density. Survives counts the point rasterizer will not.");
-        mode_ = static_cast<RenderMode>(mode);
-
-        ImGui::End();
-    }
-
-    renderCameraPanel();
 
     if (autoTurn_) {
         camera_.yaw += dt * 0.4F;
@@ -220,8 +208,14 @@ void Renderer::dragEmitter(Scene& scene, glm::mat4 const& view_proj, int w, int 
 
 void Renderer::render(FramebufferSize size, Simulation& simulation, float dt)
 {
+    if (!showRenderer_.get()) {
+        return;
+    }
+
+    ImGui::Begin("Renderer");
     renderSettings(dt);
 
+    ImGui::SeparatorText("Particle rendering");
     // Only the active pipeline's settings, so the inactive one's knobs are not sitting
     // there looking like they do something.
     if (mode_ == RenderMode::POINTS) {
@@ -232,6 +226,9 @@ void Renderer::render(FramebufferSize size, Simulation& simulation, float dt)
     }
 
     shapes_.renderSettings();
+    renderCameraPanel();
+    ImGui::End();
+
 
     float aspect = (size.height > 0)? (float)size.width / (float)size.height : 1.0F;
 

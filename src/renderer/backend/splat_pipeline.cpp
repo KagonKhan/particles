@@ -146,8 +146,6 @@ void SplatPipeline::draw(ParticleBuffer const& particles, RenderView const& view
 
 void SplatPipeline::renderSettings()
 {
-    ImGui::Begin("Splat");
-
     ImGui::SliderFloat("Density fade", &fadeScale_, 0.01F, 1.0F);
     ImGui::SetItemTooltip("How quickly accumulated density saturates to full color");
 
@@ -163,6 +161,4 @@ void SplatPipeline::renderSettings()
     ImGui::SetItemTooltip(
         "0 = flat, 1 = 1/depth, 2 = inverse-square.\n"
         "Near-flat in 2D: a parallel projection has no distance attenuation.");
-
-    ImGui::End();
 }

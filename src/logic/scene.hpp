@@ -14,8 +14,6 @@
 class Scene
 {
 public:
-    // One simulation step. The caller decides how often a step happens and how long it
-    // lasts — dt here is the simulation's, not the frame's.
     void update(float dt);
     void renderSettings();
 
@@ -23,7 +21,12 @@ public:
 
     [[nodiscard]] std::span<const ParticleVector> positions() const noexcept { return pool_->alivePositions(); }
     [[nodiscard]] float const*                    ages() const noexcept      { return pool_->ages.data(); }
-    [[nodiscard]] float                           elapsed() const noexcept   { return static_cast<float>(elapsed_); }
+    [[nodiscard]] float                           elapsed() const noexcept
+    {
+        return static_cast<float>(elapsed_);
+    }
+
+    [[nodiscard]] std::unique_ptr<ParticlePool> const& pool() const noexcept { return pool_; }
 
     // By value: the caller is a frame that has borrowed the simulation for a moment, and
     // what it draws must not be a pointer back into a scene that steps again the instant it
@@ -31,6 +34,14 @@ public:
     [[nodiscard]] std::vector<SceneObject> getSceneObjects() const
     {
         return {emitter_->object(), attractor_->object()};
+    }
+
+    // The same bodies as handles onto the live ones, for the settings panels — an edit there
+    // has to reach the object the next step reads, which a copy cannot do. Only valid while
+    // the scene is borrowed, which is the same window the copies above are taken in.
+    [[nodiscard]] std::vector<SceneObject*> sceneObjects() noexcept
+    {
+        return {&emitter_->object(), &attractor_->object()};
     }
 
     [[nodiscard]] bool benchmarking() const noexcept { return bench_.recording(); }

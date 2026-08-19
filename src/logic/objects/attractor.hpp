@@ -76,6 +76,11 @@ struct Simple
 class Attractor
 {
 public:
+    Attractor()
+    {
+        object_.attached = this;
+    }
+
     void setPosition(glm::vec2 position) { object_.transform.position = position; }
 
     void simpleApply(ParticleChunk chunk, float dt) const
@@ -119,32 +124,29 @@ public:
 
     void renderSettings()
     {
-        ImGui::Begin("Attractor Settings");
-
         for (auto& knob : settings_.knobs()) {
             knob->render();
         }
 
         ImGui::SeparatorText("Body");
-
-        renderSceneObjectSettings(object_);
-
-        ImGui::End();
     }
 
     [[nodiscard]] bool               isVisible() const noexcept { return object_.visible; }
     [[nodiscard]] SceneObject const& object() const noexcept    { return object_; }
+    [[nodiscard]] SceneObject&       object() noexcept          { return object_; }
 
 private:
     struct AttractingSettings : Simple
     {} settings_;
 
     SceneObject object_ {
-        . transform = {},
-        .shape      = Circle {},
-        .height     = 0.25F,
-        .color      = {0.55F, 0.40F, 0.80F, 1.0F},
-        .visible    = true,
+        . transform   = {},
+        .shape        = Circle {},
+        .height       = 0.25F,
+        .color        = {0.55F, 0.40F, 0.80F, 1.0F},
+        .visible      = true,
+        .name         = "Attractor",
+        .attachedType = SceneObject::AttachedType::ATTRACTOR,
     };
 
     Rng rng_;

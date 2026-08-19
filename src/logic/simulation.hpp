@@ -71,7 +71,7 @@ private:
         "How often a step happens: one per 1 / rate of wall time. Independent of the frame rate."
     };
     Knob<float> timeScale_ {
-        "Time Scale", 1.0F, 0.01F, 4.0F, "%.2fx",
+        "Time Scale", 1.0F, 0.00001F, 10.0F, "%.5fx",
         "Simulated time per step, as a multiple of the rate's. Slow motion costs nothing —\nthe same steps happen just as often, each covering less time, so the motion stays\nsmooth and the integration gets finer rather than coarser.",
         ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic
     };
