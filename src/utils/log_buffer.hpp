@@ -12,9 +12,6 @@
 #include <limits>
 
 
-// A bounded history of log messages, plus the subset of it that passes a minimum-level
-// filter. Messages are named by a sequence number that only ever grows, so ageing the oldest
-// ones out costs the drop itself and nothing beyond it: nothing has to be renumbered.
 class LogBuffer
 {
 public:
@@ -27,8 +24,6 @@ public:
     [[nodiscard]] std::size_t           rowCount() const noexcept { return visible_.size(); }
     [[nodiscard]] ConsoleMessage const& row(std::size_t index) const;
 
-    // The two ways the rows can shift under a reader caching something per row: firstRow()
-    // counts the rows dropped off the front, generation() the whole-list rebuilds.
     [[nodiscard]] std::uint64_t firstRow() const noexcept   { return firstRow_; }
     [[nodiscard]] std::uint64_t generation() const noexcept { return generation_; }
 

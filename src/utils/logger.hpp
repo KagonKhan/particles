@@ -3,9 +3,6 @@
 
 #include "utils/meta.hpp"
 
-// Teaches the formatter about std::chrono::duration and system_clock time points, so a
-// duration logs as "12ms" instead of needing .count() and a hand-written unit at every
-// call site. Include this header rather than <spdlog/spdlog.h> to get that everywhere.
 #include <spdlog/fmt/chrono.h>
 #include <spdlog/logger.h>
 #include <spdlog/spdlog.h>
@@ -18,10 +15,7 @@
 #include <utility>
 
 
-// Names a logger after Class, so every record carries the type that emitted it and the console
-// can show it. Usable two ways, because not everything that logs has an instance to hand:
-// inherit it privately and call `info(...)`, or qualify it as `Logger<Class>::info(...)` from a
-// static member or a free function that belongs to Class in all but language.
+/// @brief CRTP logger that automatically prepends (preappends?) class name
 template <typename Class>
 class Logger
 {
@@ -63,9 +57,6 @@ public:
     }
 
 private:
-    // Resolved on first log rather than on construction. The console sink is attached to the
-    // default logger inside main(), and a clone taken before that — by a static member, or by
-    // anything constructed during static initialization — would never reach the panel.
     static spdlog::logger& logger()
     {
         static std::shared_ptr<spdlog::logger> const instance = [] {
@@ -85,7 +76,7 @@ private:
     }
 };
 
-
+/// @brief global version of the logger
 class Log
 {
 public:

@@ -17,7 +17,8 @@
 
 
 template <typename T>
-constexpr ImGuiDataType DATA_TYPE = [] {
+constexpr ImGuiDataType DATA_TYPE =
+    [] {
         if constexpr (std::is_same_v<T, float>) {
             return ImGuiDataType_Float;
         }
@@ -32,7 +33,7 @@ constexpr ImGuiDataType DATA_TYPE = [] {
         }
     } ();
 
-
+/// @brief auto-incrementing widget ID for ImGui::PushID()
 class WidgetId
 {
 public:
@@ -135,8 +136,7 @@ public:
         return changed;
     }
 
-    [[nodiscard]] nlohmann::json serialize() const override { return value_; }
-
+    // TODO: finish serialization implementation for scene saving
     void deserialize(nlohmann::json const& in) override
     {
         if constexpr (std::is_floating_point_v<T>) {
@@ -157,11 +157,9 @@ public:
         }
     }
 
-    [[nodiscard]] T get() const noexcept { return value_; }
-
-    // Clamped, because the bounds are the knob's promise to everything downstream and a
-    // value arriving from a preset file has not been through a slider.
-    void set(T value) noexcept { value_ = std::clamp(value, low_, high_); }
+    [[nodiscard]] nlohmann::json serialize() const override { return value_; }
+    [[nodiscard]] T              get() const noexcept       { return value_; }
+    void                         set(T value) noexcept      { value_ = std::clamp(value, low_, high_); }
 
 private:
     char const* format_;

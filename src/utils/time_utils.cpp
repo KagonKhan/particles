@@ -7,11 +7,10 @@
 
 namespace time_utils
 {
+
 namespace
 {
 
-// Resolved once. The lookup reads the system's time zone database and throws when there is
-// none, which is not something a log line should have to survive: no zone means UTC.
 std::chrono::time_zone const* localZone()
 {
     static std::chrono::time_zone const* const zone = [] () -> std::chrono::time_zone const* {
@@ -30,8 +29,6 @@ std::chrono::time_zone const* localZone()
 
 void appendLocalTime(std::string& out, std::chrono::system_clock::time_point when)
 {
-    // Truncating to milliseconds first is what puts ".mmm" in the output: %S prints a
-    // time_point's own precision, and system_clock's is far finer than anyone can read.
     auto const timestamp = std::chrono::floor<std::chrono::milliseconds>(when);
     auto       sink      = std::back_inserter(out);
 

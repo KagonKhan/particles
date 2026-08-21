@@ -26,8 +26,6 @@ constexpr float       ROW_SPACING   = {1.0F};
 } // namespace
 
 
-// Capacity and level are applied here rather than while drawing: the panel can be hidden for the
-// whole run, and an unapplied capacity leaves the history unbounded.
 void OutputConsole::update()
 {
     applySettings();
@@ -208,8 +206,6 @@ void OutputConsole::drawRow(std::size_t row)
     ImGui::PopStyleColor();
 }
 
-// The source is always present: a line that does not say which type emitted it is the one thing
-// no amount of reading the message recovers.
 std::string_view OutputConsole::formatMessage(ConsoleMessage const& message)
 {
     scratchPad_.clear();

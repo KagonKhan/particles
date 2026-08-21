@@ -12,9 +12,24 @@
 
 
 /*
+    The actor refactor...e We have
+    1. Emitters / Cullers / Attractors
+    2. Scene objects - Spheres, Planes, ...
+    3. Behaviors - Bounce, Cull,
+
+
+
+
+
+
+*/
+
+
+/*
     THE TODO LIST:
     - Refactors and cleanups
     - Scene view - adding and removing elements from a widget.
+    - Emitter / Attractor / Shape refactor + cleanup - finalize the design choice.
 
     - Attractors (pull particles according to some math representation)
     - Boundaries (kill particles outside of bounds)

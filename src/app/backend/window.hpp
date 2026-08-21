@@ -43,8 +43,6 @@ public:
 
     void beginFrame();
     void pollEvents() const noexcept { glfwPollEvents(); }
-
-    ///@brief Blocks until an event arrives. For the frames there is no reason to draw.
     void waitEvents() const noexcept { glfwWaitEvents(); }
     void endFrame();
 
@@ -53,11 +51,8 @@ public:
 
 
 private:
-    ///@brief Creates the window and makes its context current, GLEW included.
     [[nodiscard]] static WindowHandle open(int width, int height, std::string const& title);
 
-    // Declaration order is lifetime order: GLFW before the window, the window before the
-    // interface layer that installs callbacks on it and holds GL objects from its context.
     GlfwLibrary  glfw_;
     WindowHandle window_;
     ImGuiLayer   imgui_ {window_.get()};

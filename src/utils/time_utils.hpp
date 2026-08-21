@@ -8,8 +8,6 @@
 namespace time_utils
 {
 
-// Appends the local wall-clock time as "HH:MM:SS.mmm". Appends rather than returns, because
-// the callers building a log line already own the buffer it belongs in.
 void appendLocalTime(std::string& out, std::chrono::system_clock::time_point when);
 
 } // namespace time_utils

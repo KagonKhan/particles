@@ -2,11 +2,11 @@
 
 #include <imgui.h>
 
+#include <cmath>
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <chrono>
-#include <cmath>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -16,9 +16,6 @@ namespace
 {
 
 std::filesystem::path const OUTPUT_DIR {"measurements"};
-
-// One row per run, appended, so a session's configurations end up side by side in the order
-// they were tried. The per-run sample files sit next to it for anything the summary flattens.
 std::filesystem::path const SUMMARY_FILE = OUTPUT_DIR / "summary.csv";
 
 std::string timestamp()
@@ -27,7 +24,6 @@ std::string timestamp()
     return std::format("{:%Y%m%d-%H%M%S}", now);
 }
 
-// Anything that would put a run's label somewhere other than where it says it is.
 std::string sanitize(std::string text)
 {
     if (text.empty()) {
@@ -84,6 +80,7 @@ void Bench::sample(double micros, std::size_t alive)
         if (++warmupSeen_ >= warmupSteps_) {
             state_ = State::COLLECTING;
         }
+
         return;
 
     case State::COLLECTING:
@@ -93,6 +90,7 @@ void Bench::sample(double micros, std::size_t alive)
         if (micros_.size() >= static_cast<std::size_t>(sampleSteps_)) {
             finish();
         }
+
         return;
     }
 }
@@ -110,7 +108,7 @@ void Bench::finish()
     result.samples = micros_.size();
 
     double const total = std::accumulate(micros_.begin(), micros_.end(), 0.0);
-    result.meanMicros  = total / static_cast<double>(micros_.size());
+    result.meanMicros = total / static_cast<double>(micros_.size());
 
     double const variance = std::accumulate(
         micros_.begin(),
@@ -202,7 +200,8 @@ void Bench::render(RunConfig const& current)
     ImGui::InputText("Label", label.data(), label.size());
 
     ImGui::SliderInt("Warm-up steps", &warmupSteps_, 0, 1000);
-    ImGui::SetItemTooltip("Discarded before anything is kept, so a run measures the steady state and not the change into it");
+    ImGui::SetItemTooltip(
+        "Discarded before anything is kept, so a run measures the steady state and not the change into it");
 
     ImGui::SliderInt("Sample steps", &sampleSteps_, 10, 5000);
 
@@ -229,7 +228,10 @@ void Bench::render(RunConfig const& current)
 
     ImGui::SeparatorText("Runs this session");
 
-    if (ImGui::BeginTable("runs", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+    if (ImGui::BeginTable(
+            "runs",
+            5,
+            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("Run");
         ImGui::TableSetupColumn("Mean");
         ImGui::TableSetupColumn("Median");

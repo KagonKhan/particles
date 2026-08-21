@@ -9,11 +9,7 @@
 namespace imgui_utils
 {
 
-// A toolbar whose items stay on one line while they fit and wrap onto the next when they do
-// not. ImGui only knows an item's size once it has been submitted, so each item's width has to
-// be predicted before deciding to keep it on the current line.
-//
-// Construct it where the toolbar begins: that cursor position is what fixes the right edge.
+/// @brief layout manager that auto splits to next line if no space
 class FlowLayout
 {
 public:

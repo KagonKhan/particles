@@ -36,11 +36,8 @@ private:
 
     OutputConsole console_;
 
-    Knob<bool>& performanceVisible_ {Settings::getInstance().option<bool>(
-                                         "View",
-                                         "Simulation",
-                                         true,
-                                         "The frame and simulation timings panel")
+    Knob<bool>& performanceVisible_ {
+        Settings::getInstance().option<bool>("View", "Simulation", true, "The frame and simulation timings panel")
     };
 };
 

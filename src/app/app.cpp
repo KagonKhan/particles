@@ -14,9 +14,6 @@
 namespace
 {
 
-// Frames past this buy nothing on a 60 Hz display, and every one of them is contended memory
-// bandwidth and a core the simulation could have had instead. Its own thread means capping
-// here costs the simulation nothing — the two rates are unrelated now.
 constexpr auto FRAME_PERIOD = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
     std::chrono::duration<double> {1.0 / 60.0});
 
@@ -34,8 +31,6 @@ void App::run()
     while (!window_.shouldClose()) {
         window_.pollEvents();
 
-        // Minimised, the framebuffer is 0x0: there is nothing to draw into and no reason to spin.
-        // The clock is reset rather than sampled so the idle stretch never reaches the average.
         if (window_.iconified()) {
             window_.waitEvents();
             clock_.reset();
@@ -71,8 +66,6 @@ void App::run()
         debug("Finish frame time: {}", finish_frame_time);
         debug("Full loop timing: {}", Time::duration(start_time, end_time));
 
-        // A frame that overran keeps the next one, rather than the loop trying to make the
-        // time back by drawing two in a row.
         next_frame += FRAME_PERIOD;
 
         if (auto const now = std::chrono::steady_clock::now(); (next_frame < now)) {
@@ -84,8 +77,6 @@ void App::run()
     }
 }
 
-// The scene's own panels, drawn while the simulation is held. Everything they touch is the
-// thread's to read, so the borrow is the whole point rather than an implementation detail.
 void App::renderSceneSettings()
 {
     auto scene = simulation_->borrow();

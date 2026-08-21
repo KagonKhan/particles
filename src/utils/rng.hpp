@@ -1,12 +1,14 @@
 #ifndef YARR_UTILS_RNG_HPP
 #define YARR_UTILS_RNG_HPP
 
-#include <algorithm>
 #include <cmath>
+#include <algorithm>
 #include <cstdint>
 #include <numbers>
 #include <random>
 
+
+// TODO: Finish implementing + cleanup
 class Rng
 {
 public:

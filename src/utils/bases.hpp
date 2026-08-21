@@ -1,6 +1,7 @@
 #ifndef YARR_UTILS_BASES_HPP
 #define YARR_UTILS_BASES_HPP
 
+// TODO: Probably unncessary since clang screams about special member functions regardless. Singleton is only useful
 ///@brief disables all special members
 template <typename Derived>
 class PureStatic

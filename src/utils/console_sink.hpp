@@ -22,8 +22,6 @@ struct ConsoleMessage
 class ImGuiConsoleSink : public spdlog::sinks::base_sink<std::mutex>
 {
 public:
-    // What the unnamed default logger is called in the panel. Records reach it from the free
-    // functions that belong to no type, and from spdlog itself.
     static constexpr std::string_view DEFAULT_SOURCE {"app"};
 
     template <typename Container>
@@ -42,11 +40,8 @@ public:
     }
 
 protected:
-    // base_sink::log() already holds mutex_ when calling this.
     void sink_it_(spdlog::details::log_msg const& msg) override
     {
-        // Copied rather than viewed: logger_name points into the logger, and nothing here owns
-        // a reference keeping that logger registered for as long as the panel holds the row.
         pending_.push_back(
             {
                 .level     = msg.level,

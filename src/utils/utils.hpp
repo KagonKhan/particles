@@ -14,8 +14,6 @@
 
 struct Time
 {
-    // Steady, not high_resolution_clock: libstdc++ makes the latter an alias for system_clock, so a
-    // clock adjustment or a resume would land straight in a frame time.
     [[nodiscard]] static auto measure() noexcept { return std::chrono::steady_clock::now(); }
     template <typename Duration = std::chrono::milliseconds>
     [[nodiscard]] static auto duration(auto const& t1, auto const& t2) noexcept
@@ -41,8 +39,6 @@ struct Time
 
 struct DeltaTimeClock
 {
-    // The raw frame time, for whatever integrates it: only the unsmoothed values sum back to
-    // real elapsed time. get() carries the smoothed one, which is what a readout wants.
     [[nodiscard]] float sample() noexcept
     {
         auto  now = Time::measure();
@@ -58,8 +54,6 @@ struct DeltaTimeClock
 
     [[nodiscard]] float get() const noexcept { return smoothedFrameTime_; }
 
-    // Drops the time since the last sample without letting it reach the average, for the gaps
-    // that are not frames: a minimised window, a modal resize, a pause.
     void reset() noexcept { previousFrame_ = Time::measure(); }
 
 private:
@@ -79,8 +73,6 @@ inline std::string fileToString(std::filesystem::path const& path)
 
     std::ifstream file(path, std::ios::binary);
 
-    // Checked, because a stream that failed to open reads as empty rather than throwing, and an
-    // empty shader source reaches the driver as a compile error naming nothing.
     if (!file) {
         throw FileError("{} file could not be opened", path.string());
     }
